@@ -1,0 +1,174 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Server {
+  id          String   @id @default(cuid())
+  name        String
+  apiUrl      String   @map("api_key") // Storing PRC Server Key here
+  bannerUrl   String?  // Custom banner image URL
+  customName  String?  // Display name override
+  onDutyRoleId String? // Discord Role ID to give when on duty
+  discordGuildId String? // Discord Guild ID for this server
+  autoSyncRoles Boolean @default(false) // Auto-sync roles every 10s
+  suspendedRoleId  String? // Discord Role ID - blocks mod panel access
+  terminatedRoleId String? // Discord Role ID - triggers account deletion
+  staffRoleId      String? // General staff Discord role (viewer access)
+  createdAt   DateTime @default(now())
+  
+  logs            Log[]
+  punishments     Punishment[]
+  shifts          Shift[]
+  roles           Role[]
+  members         Member[]
+  leaveOfAbsences LeaveOfAbsence[]
+  botQueue        BotQueue[]
+}
+
+model Log {
+  id        String   @id @default(cuid())
+  server    Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  serverId  String
+  type      String   // join, kill, command
+  
+  // Player info (for join/command logs)
+  playerName  String?
+  playerId    String?
+  
+  // Kill log specific
+  killerName  String?
+  killerId    String?
+  victimName  String?
+  victimId    String?
+  
+  // Command log specific
+  command     String?
+  arguments   String?
+  
+  // Join log specific
+  isJoin      Boolean @default(true) // true = join, false = leave
+  
+  // PRC timestamp (Unix)
+  prcTimestamp Int?
+  
+  createdAt DateTime @default(now())
+  
+  @@index([serverId, createdAt])
+  @@index([playerId])
+  @@index([killerId])
+  @@index([victimId])
+}
+
+model Punishment {
+  id          String   @id @default(cuid())
+  server      Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  serverId    String
+  userId      String
+  moderatorId String
+  type        String   // Warn, Kick, Ban, Ban Bolo
+  reason      String?
+  resolved    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model Shift {
+  id        String    @id @default(cuid())
+  userId    String
+  startTime DateTime  @default(now())
+  endTime   DateTime?
+  duration  Int?      // In seconds
+  
+  server    Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  serverId  String
+}
+
+model Config {
+  key   String @id
+  value String // JSON string
+}
+
+model Role {
+  id           String   @id @default(cuid())
+  name         String
+  color        String   @default("#ffffff")
+  quotaMinutes Int      @default(0) // Weekly
+  isDefault    Boolean  @default(false)
+  discordRoleId String? // Discord Role ID to sync
+  
+  // Permissions
+  canShift            Boolean @default(true)
+  canViewOtherShifts  Boolean @default(true)
+  canViewLogs         Boolean @default(true)
+  canViewPunishments  Boolean @default(true)
+  canIssueWarnings    Boolean @default(true)
+  canKick             Boolean @default(true)
+  canBan              Boolean @default(true)
+  canBanBolo          Boolean @default(true)
+  canUseToolbox       Boolean @default(true)
+  canManageBolos      Boolean @default(true)
+  canRequestLoa       Boolean @default(true)
+  canViewQuota        Boolean @default(true)
+  
+  server       Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  serverId     String
+  
+  members      Member[]
+}
+
+model Member {
+  id        String   @id @default(cuid())
+  userId    String   // Clerk user ID
+  discordId String?  // Discord user ID for bot lookups
+  isAdmin   Boolean  @default(false) // Can access admin panel
+  
+  server    Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  serverId  String
+  
+  role      Role?    @relation(fields: [roleId], references: [id])
+  roleId    String?
+  
+  createdAt DateTime @default(now())
+
+  @@unique([userId, serverId])
+  @@index([discordId, serverId])
+}
+
+model LeaveOfAbsence {
+  id          String    @id @default(cuid())
+  userId      String
+  serverId    String
+  server      Server    @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  startDate   DateTime
+  endDate     DateTime
+  reason      String
+  status      String    @default("pending") // pending, approved, declined
+  reviewedBy  String?   // Admin who reviewed
+  reviewedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  
+  @@index([serverId, status])
+  @@index([userId])
+}
+
+model BotQueue {
+  id        String   @id @default(cuid())
+  server    Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  serverId  String
+  
+  type      String   // MESSAGE, DM
+  targetId  String   // Channel ID or User ID
+  content   String
+  
+  status    String   @default("PENDING") // PENDING, SENT, FAILED
+  error     String?
+  
+  createdAt   DateTime @default(now())
+  processedAt DateTime?
+
+  @@index([serverId, status])
+}

@@ -1,0 +1,112 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  /* Safe area for iOS notches */
+  --safe-area-inset-top: env(safe-area-inset-top, 0px);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Custom Scrollbar - Dark Theme */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #444;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #333 transparent;
+}
+
+/* ========== PWA MOBILE UTILITIES ========== */
+
+/* Safe area padding for bottom nav */
+.pb-safe {
+  padding-bottom: var(--safe-area-inset-bottom);
+}
+
+.pt-safe {
+  padding-top: var(--safe-area-inset-top);
+}
+
+/* Add bottom padding to main content when bottom nav is visible */
+@media (max-width: 768px) {
+  .has-bottom-nav {
+    padding-bottom: calc(4rem + var(--safe-area-inset-bottom));
+  }
+}
+
+/* Prevent pull-to-refresh in PWA */
+html {
+  overscroll-behavior: none;
+}
+
+/* Improve touch targets on mobile */
+@media (max-width: 768px) {
+
+  button,
+  a,
+  [role="button"] {
+    min-height: 44px;
+  }
+
+  /* Disable text selection on interactive elements for better touch feel */
+  button,
+  [role="button"] {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Standalone PWA status bar area */
+@supports (padding-top: env(safe-area-inset-top)) {
+  .pwa-status-bar-padding {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
+/* Fix for iOS rubber banding */
+@media (max-width: 768px) {
+
+  html,
+  body {
+    overscroll-behavior-y: contain;
+    position: relative;
+  }
+}

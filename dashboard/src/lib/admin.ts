@@ -1,0 +1,193 @@
+
+import { prisma } from "@/lib/db"
+
+// The superadmin username - only this user can grant admin access
+const SUPER_ADMIN_USERNAME = process.env.SUPER_ADMIN_USERNAME || "cisaa"
+
+export interface SessionUser {
+    id: string
+    username?: string | null
+    name?: string | null
+    discordId?: string
+    robloxId?: string
+    robloxUsername?: string | null
+}
+
+// New permission structure matching schema
+export interface RolePermissions {
+    canShift: boolean
+    canViewOtherShifts: boolean
+    canViewLogs: boolean
+    canViewPunishments: boolean
+    canIssueWarnings: boolean
+    canKick: boolean
+    canBan: boolean
+    canBanBolo: boolean
+    canUseToolbox: boolean
+    canManageBolos: boolean
+    canRequestLoa: boolean
+    canViewQuota: boolean
+    canUseAdminCommands: boolean
+}
+
+// Default permissions (no permissions)
+export const DEFAULT_PERMISSIONS: RolePermissions = {
+    canShift: false,
+    canViewOtherShifts: false,
+    canViewLogs: false,
+    canViewPunishments: false,
+    canIssueWarnings: false,
+    canKick: false,
+    canBan: false,
+    canBanBolo: false,
+    canUseToolbox: false,
+    canManageBolos: false,
+    canRequestLoa: false,
+    canViewQuota: false,
+    canUseAdminCommands: false
+}
+
+// All permissions (for superadmin)
+export const ALL_PERMISSIONS: RolePermissions = {
+    canShift: true,
+    canViewOtherShifts: true,
+    canViewLogs: true,
+    canViewPunishments: true,
+    canIssueWarnings: true,
+    canKick: true,
+    canBan: true,
+    canBanBolo: true,
+    canUseToolbox: true,
+    canManageBolos: true,
+    canRequestLoa: true,
+    canViewQuota: true,
+    canUseAdminCommands: true
+}
+
+/**
+ * Check if the user is the superadmin (can grant admin access to others)
+ */
+export function isSuperAdmin(user: SessionUser | null): boolean {
+    if (!user) return false
+
+    // Check both username and display name against the superadmin config (case-insensitive)
+    const target = SUPER_ADMIN_USERNAME.toLowerCase()
+
+    return user.username?.toLowerCase() === target || user.name?.toLowerCase() === target
+}
+
+/**
+ * Check if the user is an admin for a specific server
+ */
+export async function isServerAdmin(user: SessionUser | null, serverId: string): Promise<boolean> {
+    if (!user) return false
+
+    // Superadmin always has access
+    if (isSuperAdmin(user)) return true
+
+    // Build possible user IDs to check (member might be stored with any of these)
+    const possibleIds = [user.id]
+    if (user.discordId) possibleIds.push(user.discordId)
+    if (user.robloxId) possibleIds.push(user.robloxId)
+
+    // Check if any of the user's possible IDs are marked as admin in the Member table
+    const member = await prisma.member.findFirst({
+        where: {
+            serverId,
+            userId: { in: possibleIds },
+            isAdmin: true
+        }
+    })
+
+    return member !== null
+}
+
+/**
+ * Get the user's role and permissions for a server
+ */
+export async function getUserPermissions(user: SessionUser | null, serverId: string): Promise<RolePermissions> {
+    if (!user) return DEFAULT_PERMISSIONS
+
+    // Superadmin has all permissions
+    if (isSuperAdmin(user)) return ALL_PERMISSIONS
+
+    // Build possible user IDs to check (member might be stored with any of these)
+    const possibleIds = [user.id]
+    if (user.discordId) possibleIds.push(user.discordId)
+    if (user.robloxId) possibleIds.push(user.robloxId)
+
+    const member = await prisma.member.findFirst({
+        where: {
+            serverId,
+            userId: { in: possibleIds }
+        },
+        include: { role: true }
+    })
+
+    if (!member?.role) return DEFAULT_PERMISSIONS
+
+    // Return permissions directly from role (no JSON parsing needed)
+    return {
+        canShift: member.role.canShift,
+        canViewOtherShifts: member.role.canViewOtherShifts,
+        canViewLogs: member.role.canViewLogs,
+        canViewPunishments: member.role.canViewPunishments,
+        canIssueWarnings: member.role.canIssueWarnings,
+        canKick: member.role.canKick,
+        canBan: member.role.canBan,
+        canBanBolo: member.role.canBanBolo,
+        canUseToolbox: member.role.canUseToolbox,
+        canManageBolos: member.role.canManageBolos,
+        canRequestLoa: member.role.canRequestLoa,
+        canViewQuota: member.role.canViewQuota,
+        canUseAdminCommands: member.role.canUseAdminCommands
+    }
+}
+
+/**
+ * Check if user has a specific permission
+ */
+export async function hasPermission(
+    user: SessionUser | null,
+    serverId: string,
+    permission: keyof RolePermissions
+): Promise<boolean> {
+    const perms = await getUserPermissions(user, serverId)
+    return perms[permission]
+}
+
+/**
+ * Check if user is currently on an approved leave of absence
+ */
+export async function isOnLeave(userId: string, serverId: string): Promise<boolean> {
+    const now = new Date()
+
+    const activeLoa = await prisma.leaveOfAbsence.findFirst({
+        where: {
+            userId,
+            serverId,
+            status: "approved",
+            startDate: { lte: now },
+            endDate: { gte: now }
+        }
+    })
+
+    return activeLoa !== null
+}
+
+/**
+ * Get user's active LOA if any
+ */
+export async function getActiveLeave(userId: string, serverId: string) {
+    const now = new Date()
+
+    return await prisma.leaveOfAbsence.findFirst({
+        where: {
+            userId,
+            serverId,
+            status: "approved",
+            startDate: { lte: now },
+            endDate: { gte: now }
+        }
+    })
+}

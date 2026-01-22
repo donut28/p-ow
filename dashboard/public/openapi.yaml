@@ -1,0 +1,519 @@
+openapi: 3.0.0
+info:
+  title: Project Overwatch API
+  description: |
+    Enterprise API for high-level management of ERLC Private Servers.
+    
+    ### 🔑 Identity Systems
+    This API stores identifiers as plain strings and does not enforce a specific format. However, certain features require specific ID types to function correctly:
+    
+    1. **Shifts & Staff On-Duty**: 
+       - **Required Format**: **Clerk User ID** (e.g., `user_2mGj...`).
+       - **Why**: The `/staff/on-duty` endpoint resolves shift user IDs via the Clerk API to fetch staff names and Roblox usernames. If you pass a non-Clerk ID, the lookup will fail silently.
+    
+    2. **Punishments**: 
+       - **Recommended Format**: **Roblox UserID** (numerical, e.g., `12345678`).
+       - **Why**: The dashboard tracks punishments by Roblox ID. Using a different format will work, but may not integrate correctly with the dashboard UI.
+       - **`moderatorId`**: Accepts any string. Dashboard uses Clerk IDs, but you can pass Roblox IDs if preferred.
+    
+    3. **Player Lists & Logs**: 
+       - **Format**: **Roblox UserID** (numerical).
+       - **Why**: These are sourced directly from the game server via PRC.
+    
+    ### 📡 Server Identification
+    All server-specific endpoints require a `server` parameter.
+    - **Accepts**: Both the **Internal System Name** (e.g., `LACOMM Server A`) and the **Custom Display Name**.
+    - **Matching**: Case-insensitive, supports partial matching.
+    
+    ### 🔒 Authentication
+    - **Header**: `Authorization: Bearer <your_key>`
+    - **Key Format**: Keys are prefixed with `pow_`.
+    - **Manage Keys**: `https://pow.ciankelly.xyz/dashboard/settings`
+    
+    ### ⚠️ Rate Limiting
+    - **429 Too Many Requests**: Returned when you exceed the request frequency limit.
+    - **401 Unauthorized**: Returned for invalid keys or exceeded daily quotas.
+  version: 1.8.0
+
+servers:
+  - url: /api/public/v1
+    description: Public API v1
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /servers:
+    get:
+      summary: List All Servers
+      tags: [System]
+      description: Returns all servers linked to your dashboard.
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ServerInfo' }
+
+  /members:
+    get:
+      summary: List Server Members
+      tags: [Staff]
+      description: Returns the staff directory. Member `userId` values are Clerk User IDs.
+      parameters:
+        - name: server
+          in: query
+          required: true
+          description: Server name or custom display name.
+          example: "LACOMM Server A"
+          schema: { type: string }
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MemberInfo' }
+
+  /shifts/status:
+    get:
+      summary: Check Shift Status
+      tags: [Shifts]
+      description: Check if a user has an active shift. Uses exact string matching on `userId`.
+      parameters:
+        - name: server
+          in: query
+          required: true
+          description: Server name or custom display name.
+          example: "LACOMM Server A"
+          schema: { type: string }
+        - name: userId
+          in: query
+          required: true
+          schema: { type: string }
+          description: |
+            The user identifier. **Must match exactly** what was used when the shift was started.
+            Dashboard shifts use **Clerk User IDs** (e.g., `user_2mGj...`).
+          example: "user_2mGjxRbc123"
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  active: { type: boolean }
+                  shift: { $ref: '#/components/schemas/ShiftRecord' }
+
+  /shifts/start:
+    post:
+      summary: Start Shift
+      tags: [Shifts]
+      description: |
+        Clocks a user into a shift. The `userId` you provide is stored verbatim.
+        **Recommendation**: Use a **Clerk User ID** so the `/staff/on-duty` endpoint can resolve staff details.
+      parameters:
+        - name: server
+          in: query
+          required: true
+          description: Server name or custom display name.
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId: 
+                  type: string
+                  description: User identifier (Clerk ID recommended for full feature support).
+                  example: "user_2mGjxRbc123"
+      responses:
+        '200':
+          description: Success
+        '400':
+          description: Shift already active
+
+  /shifts/end:
+    post:
+      summary: End Shift
+      tags: [Shifts]
+      description: Clocks a user out. `userId` must match exactly what was used to start the shift.
+      parameters:
+        - name: server
+          in: query
+          required: true
+          description: Server name or custom display name.
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId: 
+                  type: string
+                  description: Must match the ID used in `/shifts/start`.
+                  example: "user_2mGjxRbc123"
+      responses:
+        '200':
+          description: Success
+        '404':
+          description: No active shift found
+
+  /staff/on-duty:
+    get:
+      summary: Get On-Duty Staff
+      tags: [Staff]
+      description: |
+        Returns staff currently in an active shift. 
+        **Important**: This endpoint looks up shift `userId` values via the Clerk API. 
+        Only shifts started with valid **Clerk User IDs** will return enriched data (name, Roblox username, avatar).
+      parameters:
+        - name: server
+          in: query
+          required: true
+          description: Server name or custom display name.
+          example: "LACOMM Server A"
+          schema: { type: string }
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/OnDutyStaff' }
+
+  /staff/request:
+    post:
+      summary: Create Staff Request
+      tags: [Staff]
+      description: Notifies on-duty staff in-game and optionally via Discord.
+      parameters:
+        - name: server
+          in: query
+          required: false
+          description: Server name (can also be provided in body as `server` or `serverName`).
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                server: 
+                  type: string
+                  description: Server name or custom display name (alternative to query param).
+                serverName: 
+                  type: string
+                  description: Alias for `server`.
+                requester: 
+                  type: string
+                  description: Display name shown in notifications (e.g., Roblox username).
+                  example: "Builderman"
+                reason: 
+                  type: string
+                  description: Why staff assistance is needed.
+                  example: "Suspicious activity at the bank"
+                location: 
+                  type: string
+                  description: In-game location.
+                  example: "Main Street Bank"
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  staffNotified: { type: integer, description: Number of in-game staff PMed. }
+
+  /stats:
+    get:
+      summary: Get Server Stats
+      tags: [Server]
+      description: Returns live server status from PRC.
+      parameters:
+        - name: server
+          in: query
+          required: true
+          description: Server name or custom display name.
+          example: "LACOMM Server A"
+          schema: { type: string }
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServerStats' }
+
+  /players:
+    get:
+      summary: Get Server Players
+      tags: [Server]
+      description: Returns players currently in-game. Player IDs are **Roblox UserIDs** (numerical).
+      parameters:
+        - name: server
+          in: query
+          required: true
+          description: Server name or custom display name.
+          example: "LACOMM Server A"
+          schema: { type: string }
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlayerList' }
+
+  /logs:
+    get:
+      summary: Get Activity Logs
+      tags: [Logs]
+      description: Returns recent activity logs. Player IDs in logs are **Roblox UserIDs**.
+      parameters:
+        - name: server
+          in: query
+          required: true
+          description: Server name or custom display name.
+          example: "LACOMM Server A"
+          schema: { type: string }
+        - name: type
+          in: query
+          required: false
+          description: Filter by log type.
+          example: "kill"
+          schema: { type: string, enum: [join, kill, command] }
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/LogEntry' }
+
+  /punishments:
+    get:
+      summary: Get Punishment History
+      tags: [Moderation]
+      description: Returns punishments. Filter by `userId` (typically a Roblox UserID).
+      parameters:
+        - name: server
+          in: query
+          required: true
+          description: Server name or custom display name.
+          example: "LACOMM Server A"
+          schema: { type: string }
+        - name: userId
+          in: query
+          description: Filter by target's stored ID (dashboard uses Roblox UserIDs).
+          example: "45032"
+          schema: { type: string }
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Punishment' }
+    post:
+      summary: Log a Punishment
+      tags: [Moderation]
+      description: |
+        Creates a punishment record. Both `userId` and `moderatorId` are stored as-is.
+        **Dashboard convention**: `userId` = Roblox UserID, `moderatorId` = Clerk User ID.
+        The API does not enforce this; use whatever format fits your integration.
+      parameters:
+        - name: server
+          in: query
+          required: true
+          description: Server name or custom display name.
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, moderatorId, type]
+              properties:
+                userId: 
+                  type: string
+                  description: Target identifier (any string, dashboard uses Roblox UserID).
+                  example: "45032"
+                moderatorId: 
+                  type: string
+                  description: Issuer identifier (any string, dashboard uses Clerk User ID).
+                  example: "user_2mGjxRbc123"
+                type: 
+                  type: string
+                  enum: ["Warn", "Kick", "Ban", "Ban Bolo"]
+                reason: 
+                  type: string
+                  example: "RDM and LTAP"
+      responses:
+        '200':
+          description: Success
+
+  /roblox/user:
+    get:
+      summary: Lookup Roblox User
+      tags: [System]
+      description: Fetches Roblox account data by username.
+      parameters:
+        - name: username
+          in: query
+          required: true
+          description: Roblox Username (not UserID).
+          example: "Builderman"
+          schema: { type: string }
+      responses:
+        '200':
+          description: Success
+
+  /commands:
+    post:
+      summary: Execute Remote Command
+      tags: [Server]
+      description: Sends a command to the game server via PRC.
+      parameters:
+        - name: server
+          in: query
+          required: true
+          description: Server name or custom display name.
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [command]
+              properties:
+                command: 
+                  type: string
+                  description: The full command string (e.g., `:m Hello`).
+                  example: ":m Server restarting in 5 minutes!"
+      responses:
+        '200':
+          description: Success
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: http
+      scheme: bearer
+      description: API Key prefixed with `pow_`. Obtain from Settings dashboard.
+
+  schemas:
+    ServerInfo:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string, description: Internal system name. }
+        customName: { type: string, nullable: true, description: Custom display name. }
+        createdAt: { type: string, format: date-time }
+
+    MemberInfo:
+      type: object
+      properties:
+        id: { type: string }
+        userId: { type: string, description: Clerk User ID. }
+        discordId: { type: string, nullable: true, description: Discord User ID if linked. }
+        isAdmin: { type: boolean }
+        role:
+          type: object
+          nullable: true
+          properties:
+            name: { type: string }
+            color: { type: string }
+            isDefault: { type: boolean }
+
+    ShiftRecord:
+      type: object
+      properties:
+        id: { type: string }
+        userId: { type: string, description: The ID provided when shift was started. }
+        startTime: { type: string, format: date-time }
+        endTime: { type: string, format: date-time, nullable: true }
+        duration: { type: integer, description: Seconds, only set after shift ends., nullable: true }
+
+    OnDutyStaff:
+      type: object
+      properties:
+        userId: { type: string, description: Clerk User ID. }
+        name: { type: string, description: Display name from Clerk. }
+        robloxUsername: { type: string, description: Linked Roblox username. }
+        robloxId: { type: string, nullable: true, description: Roblox UserID (numerical). }
+        imageUrl: { type: string, description: Clerk profile picture URL. }
+        shiftStart: { type: string, format: date-time }
+
+    ServerStats:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        online: { type: boolean }
+        players: { type: integer }
+        maxPlayers: { type: integer }
+        timestamp: { type: string, format: date-time }
+
+    PlayerList:
+      type: object
+      properties:
+        serverId: { type: string }
+        serverName: { type: string }
+        playerCount: { type: integer }
+        players:
+          type: array
+          items: { $ref: '#/components/schemas/Player' }
+        timestamp: { type: string, format: date-time }
+
+    Player:
+      type: object
+      properties:
+        name: { type: string, description: Roblox Username. }
+        id: { type: string, description: Roblox UserID (numerical). }
+        team: { type: string }
+        permission: { type: string, description: PRC permission level. }
+        vehicle: { type: string, nullable: true }
+        callsign: { type: string, nullable: true }
+
+    LogEntry:
+      type: object
+      properties:
+        id: { type: string }
+        type: { type: string, description: "join, kill, command, or leave." }
+        playerName: { type: string, nullable: true }
+        playerId: { type: string, nullable: true, description: Roblox UserID. }
+        killerName: { type: string, nullable: true }
+        killerId: { type: string, nullable: true }
+        victimName: { type: string, nullable: true }
+        victimId: { type: string, nullable: true }
+        command: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    Punishment:
+      type: object
+      properties:
+        id: { type: string }
+        serverId: { type: string }
+        userId: { type: string, description: Target ID (dashboard uses Roblox UserID). }
+        moderatorId: { type: string, description: Issuer ID (dashboard uses Clerk User ID). }
+        type: { type: string }
+        reason: { type: string, nullable: true }
+        resolved: { type: boolean }
+        createdAt: { type: string, format: date-time }

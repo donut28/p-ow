@@ -1,0 +1,20 @@
+{
+    "name": "project-overwatch",
+    "version": "1.0.0",
+    "description": "Project Overwatch - Dashboard and Discord Bot",
+    "workspaces": [
+        "dashboard",
+        "bot"
+    ],
+    "scripts": {
+        "dev": "concurrently \"npm run dashboard\" \"npm run bot\"",
+        "start": "concurrently \"npm run dashboard\" \"npm run bot\"",
+        "dashboard": "cd dashboard && npm run start",
+        "bot": "cd bot && npm run start",
+        "build": "cd dashboard && npm run build",
+        "deploy-commands": "cd bot && npm run deploy"
+    },
+    "devDependencies": {
+        "concurrently": "^8.2.2"
+    }
+}

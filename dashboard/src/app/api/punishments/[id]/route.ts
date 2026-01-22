@@ -1,0 +1,62 @@
+
+import { getSession } from "@/lib/auth-clerk"
+import { prisma } from "@/lib/db"
+import { NextResponse } from "next/server"
+
+import { verifyPermissionOrError } from "@/lib/auth-permissions"
+
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+    const session = await getSession()
+    if (!session) return new NextResponse("Unauthorized", { status: 401 })
+
+    const { id } = await params
+
+    // Verify permission - Require canBan to delete punishments (highest level mod action)
+    const punishment = await prisma.punishment.findUnique({ where: { id } })
+    if (!punishment) return new NextResponse("Not Found", { status: 404 })
+
+    const error = await verifyPermissionOrError(session.user, punishment.serverId, "canBan")
+    if (error) return error
+
+    try {
+        await prisma.punishment.delete({
+            where: { id }
+        })
+        return NextResponse.json({ success: true })
+    } catch (e) {
+        console.error("Delete punishment error:", e)
+        return new NextResponse("Failed to delete", { status: 500 })
+    }
+}
+
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+    const session = await getSession()
+    if (!session) return new NextResponse("Unauthorized", { status: 401 })
+
+    const { id } = await params
+    const body = await req.json()
+
+    const punishment = await prisma.punishment.findUnique({ where: { id } })
+    if (!punishment) return new NextResponse("Not Found", { status: 404 })
+
+    // If resolving a BOLO, check canManageBolos
+    if (body.resolved !== undefined && punishment.type === "Ban Bolo") {
+        const error = await verifyPermissionOrError(session.user, punishment.serverId, "canManageBolos")
+        if (error) return error
+    }
+
+    try {
+        const updateData: { reason?: string, resolved?: boolean } = {}
+        if (body.reason !== undefined) updateData.reason = body.reason
+        if (body.resolved !== undefined) updateData.resolved = body.resolved
+
+        const updated = await prisma.punishment.update({
+            where: { id },
+            data: updateData
+        })
+        return NextResponse.json(updated)
+    } catch (e) {
+        console.error("Update punishment error:", e)
+        return new NextResponse("Failed to update", { status: 500 })
+    }
+}
