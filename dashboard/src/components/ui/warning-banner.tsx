@@ -2,18 +2,18 @@
 
 import { useEffect, useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
+import { usePostHog } from '@posthog/react'
 
 export function WarningBanner() {
+    const posthog = usePostHog()
     const [message, setMessage] = useState<string | null>(null)
 
     useEffect(() => {
-        const updateState = () => {
-            // @ts-ignore
-            const ph = window.posthog
-            if (!ph) return
+        if (!posthog) return
 
-            const enabled = ph.isFeatureEnabled('warning-banner')
-            const payload = ph.getFeatureFlagPayload('warning-banner')
+        const updateState = () => {
+            const enabled = posthog.isFeatureEnabled('warning-banner')
+            const payload = posthog.getFeatureFlagPayload('warning-banner')
 
             if (enabled && payload) {
                 const msg = typeof payload === 'string' 
@@ -25,27 +25,10 @@ export function WarningBanner() {
             }
         }
 
-        const onReady = () => {
-            updateState()
-            // @ts-ignore
-            if (window.posthog) {
-                // @ts-ignore
-                window.posthog.onFeatureFlags(updateState)
-            }
-        }
-
-        // Check if already ready
-        // @ts-ignore
-        if (window.posthog) {
-            onReady()
-        }
-
-        window.addEventListener('posthog-ready', onReady)
-
-        return () => {
-            window.removeEventListener('posthog-ready', onReady)
-        }
-    }, [])
+        updateState()
+        // Subscribe to feature flag updates
+        posthog.onFeatureFlags(updateState)
+    }, [posthog])
 
     if (!message) return null
 

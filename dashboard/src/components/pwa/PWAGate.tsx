@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Download, Share, Plus, MoreVertical, ChevronRight } from "lucide-react"
+import { Download, Share, Plus, MoreVertical } from "lucide-react"
+import { usePWA } from "@/components/providers/pwa-provider"
 
 /**
  * PWA Gate - Forces mobile users to install the app before using it
@@ -10,68 +11,19 @@ import { Download, Share, Plus, MoreVertical, ChevronRight } from "lucide-react"
 export function PWAGate({ children }: { children: React.ReactNode }) {
     // Start with null states to ensure server/client match
     const [isMounted, setIsMounted] = useState(false)
-    const [isStandalone, setIsStandalone] = useState(false)
-    const [isMobile, setIsMobile] = useState(false)
-    const [isIOS, setIsIOS] = useState(false)
-    const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
+    const { isMobile, isInstalled, isIOS, canInstall, install } = usePWA()
 
     useEffect(() => {
-        // Mark as mounted first
         setIsMounted(true)
-
-        // Check if running as installed PWA (standalone mode)
-        const standalone = window.matchMedia("(display-mode: standalone)").matches ||
-            (window.navigator as any).standalone === true ||
-            document.referrer.includes("android-app://")
-        setIsStandalone(standalone)
-
-        // Check if mobile device
-        const mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-        setIsMobile(mobile)
-
-        const ios = /iPad|iPhone|iPod/.test(navigator.userAgent)
-        setIsIOS(ios)
-
-        // Listen for install prompt (Android/Chrome)
-        const handleBeforeInstallPrompt = (e: Event) => {
-            e.preventDefault()
-            setDeferredPrompt(e)
-        }
-
-        window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
-
-        // Listen for display mode changes
-        window.matchMedia("(display-mode: standalone)").addEventListener("change", (e) => {
-            setIsStandalone(e.matches)
-        })
-
-        return () => {
-            window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
-        }
     }, [])
 
-    // Handle Android install
-    const handleInstall = async () => {
-        if (!deferredPrompt) return
-
-        deferredPrompt.prompt()
-        const { outcome } = await deferredPrompt.userChoice
-
-        if (outcome === "accepted") {
-            setDeferredPrompt(null)
-            // Refresh to check standalone mode
-            window.location.reload()
-        }
-    }
-
     // Server render AND initial client render: always show children
-    // This prevents hydration mismatch
     if (!isMounted) {
         return <>{children}</>
     }
 
     // After mount: Desktop or already installed - show normal content
-    if (!isMobile || isStandalone) {
+    if (!isMobile || isInstalled) {
         return <>{children}</>
     }
 
@@ -136,9 +88,9 @@ export function PWAGate({ children }: { children: React.ReactNode }) {
             {/* Android Install Button */}
             {!isIOS && (
                 <div className="w-full max-w-sm space-y-4">
-                    {deferredPrompt ? (
+                    {canInstall ? (
                         <button
-                            onClick={handleInstall}
+                            onClick={install}
                             className="w-full py-4 px-6 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold rounded-2xl flex items-center justify-center gap-3 shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 transition-all active:scale-95"
                         >
                             <Download className="w-5 h-5" />

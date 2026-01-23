@@ -7,9 +7,9 @@ import { CookieConsentBanner } from "@/components/cookie-consent-banner";
 import { MaintenanceGate } from "@/components/maintenance-gate";
 import { PWAGate } from "@/components/pwa/PWAGate";
 import { PWARegister } from "@/components/pwa/PWARegister";
+import { PWAProvider } from "@/components/providers/pwa-provider";
 
 const montserrat = Montserrat({ subsets: ["latin"] });
-
 export const metadata = {
   title: "Project Overwatch",
   description: "ERLC Multi-Server Dashboard",
@@ -59,11 +59,13 @@ export default function RootLayout({
           <MaintenanceGate>
             <CookieConsentProvider>
               <PostHogProvider>
-                <PWARegister />
-                <PWAGate>
-                  {children}
-                </PWAGate>
-                <CookieConsentBanner />
+                <PWAProvider>
+                    <PWARegister />
+                    <PWAGate>
+                      {children}
+                    </PWAGate>
+                    <CookieConsentBanner />
+                </PWAProvider>
               </PostHogProvider>
             </CookieConsentProvider>
           </MaintenanceGate>
