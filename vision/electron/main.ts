@@ -1,4 +1,5 @@
 import { app, BrowserWindow, globalShortcut, ipcMain, desktopCapturer, screen, shell } from 'electron'
+import { autoUpdater } from 'electron-updater'
 import * as path from 'path'
 import crypto from 'crypto'
 import Store from 'electron-store'
@@ -308,6 +309,15 @@ ipcMain.handle('open-external', async (_event, url: string) => {
     await shell.openExternal(url)
 })
 
+// Hide overlay (for X button in UI)
+ipcMain.handle('hide-overlay', () => {
+    if (overlayWindow) {
+        overlayWindow.hide()
+        isOverlayVisible = false
+    }
+    return true
+})
+
 // Move window to position near cursor (for positioning near detected username)
 ipcMain.on('move-window', (_event, x: number, y: number) => {
     if (!overlayWindow) return
@@ -388,28 +398,48 @@ function createTray() {
 
         tray = new Tray(image)
 
-        const contextMenu = Menu.buildFromTemplate([
-            {
-                label: 'Show Overlay',
-                click: () => {
-                    if (overlayWindow) {
-                        overlayWindow.show()
-                        isOverlayVisible = true
+        // Build menu dynamically based on visibility state
+        const buildContextMenu = () => {
+            return Menu.buildFromTemplate([
+                {
+                    label: isOverlayVisible ? 'Hide Overlay' : 'Show Overlay',
+                    click: () => {
+                        if (overlayWindow) {
+                            if (isOverlayVisible) {
+                                overlayWindow.hide()
+                                isOverlayVisible = false
+                            } else {
+                                overlayWindow.show()
+                                isOverlayVisible = true
+                            }
+                        }
+                    }
+                },
+                { type: 'separator' },
+                {
+                    label: 'Quit POW Vision',
+                    click: () => {
+                        isQuitting = true
+                        app.quit()
                     }
                 }
-            },
-            { type: 'separator' },
-            {
-                label: 'Quit POW Vision',
-                click: () => {
-                    isQuitting = true
-                    app.quit()
-                }
-            }
-        ])
+            ])
+        }
 
         tray.setToolTip('POW Vision')
-        tray.setContextMenu(contextMenu)
+
+        // On Windows, right-click shows menu. On macOS, regular click does.
+        // We rebuild the menu each time to ensure it reflects current state
+        tray.on('click', () => {
+            tray.setContextMenu(buildContextMenu())
+        })
+        tray.on('right-click', () => {
+            tray.setContextMenu(buildContextMenu())
+            tray.popUpContextMenu()
+        })
+
+        // Set initial menu
+        tray.setContextMenu(buildContextMenu())
 
         // Restore on double click
         tray.on('double-click', () => {
@@ -438,6 +468,17 @@ app.whenReady().then(async () => {
     createOverlayWindow()
     createTray()
     registerHotkey()
+
+    // Check for updates (only in production)
+    if (app.isPackaged) {
+        console.log('[Updater] Checking for updates...')
+        autoUpdater.checkForUpdatesAndNotify()
+
+        // Check every hour
+        setInterval(() => {
+            autoUpdater.checkForUpdatesAndNotify()
+        }, 60 * 60 * 1000)
+    }
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {

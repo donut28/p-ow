@@ -17,6 +17,7 @@ interface ElectronAPI {
     moveWindow: (x: number, y: number) => void
     openExternal: (url: string) => Promise<void>
     generateSignature: () => Promise<string>
+    hideOverlay: () => Promise<boolean>
 }
 
 declare global {

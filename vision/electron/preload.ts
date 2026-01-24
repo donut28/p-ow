@@ -34,7 +34,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     moveWindow: (x: number, y: number) => ipcRenderer.send('move-window', x, y),
 
     // Open URL in system default browser
-    openExternal: (url: string) => ipcRenderer.invoke('open-external', url)
+    openExternal: (url: string) => ipcRenderer.invoke('open-external', url),
+
+    // Hide the overlay (for X button)
+    hideOverlay: () => ipcRenderer.invoke('hide-overlay')
 })
 
 // Type definitions for renderer
@@ -49,6 +52,7 @@ export interface ElectronAPI {
     onTriggerCapture: (callback: () => void) => () => void
     moveWindow: (x: number, y: number) => void
     openExternal: (url: string) => Promise<void>
+    hideOverlay: () => Promise<boolean>
 }
 
 declare global {

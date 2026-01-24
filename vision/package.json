@@ -17,6 +17,7 @@
     "private": true,
     "dependencies": {
         "electron-store": "^8.1.0",
+        "electron-updater": "^6.7.3",
         "posthog-js": "^1.335.2",
         "tesseract.js": "^5.1.0"
     },
@@ -27,7 +28,7 @@
         "@vitejs/plugin-react": "^4.2.0",
         "autoprefixer": "^10.4.19",
         "concurrently": "^8.2.2",
-        "electron": "^33.0.0",
+        "electron": "33.4.11",
         "electron-builder": "^24.13.0",
         "postcss": "^8.4.38",
         "react": "^18.2.0",
@@ -80,6 +81,11 @@
         "nsis": {
             "oneClick": false,
             "allowToChangeInstallationDirectory": true
+        },
+        "publish": {
+            "provider": "github",
+            "owner": "ciankellyy",
+            "repo": "p-ow"
         }
     }
 }
