@@ -111,9 +111,22 @@ if [ ! -f "${SHARED_ENV_FILE}" ]; then
     read -p "Clerk Secret Key: " CLERK_SECRET_KEY
     read -p "Clerk Publishable Key: " NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
     read -p "Roblox API Key (Open Cloud): " ROBLOX_API_KEY
+    read -p "Discord Punishment Webhook URL: " DISCORD_PUNISHMENT_WEBHOOK
+    read -p "Discord Bot Token: " DISCORD_BOT_TOKEN
+    read -p "Discord Client ID: " CLIENT_ID
+    read -p "Discord Guild ID: " GUILD_ID
+    read -p "Clerk Secret Key: " CLERK_SECRET_KEY
+    read -p "Clerk Publishable Key: " NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+    read -p "Roblox API Key (Open Cloud): " ROBLOX_API_KEY
+    read -p "Discord Punishment Webhook URL: " DISCORD_PUNISHMENT_WEBHOOK
+    read -p "Mistral API Key: " MISTRAL_API_KEY
+    read -p "Garmin API Key: " GARMIN_API_KEY
+    read -p "PostHog Project API Key: " POSTHOG_KEY
     
     NEXTAUTH_SECRET=$(openssl rand -base64 32)
     INTERNAL_SECRET=$(openssl rand -base64 32)
+    VISION_JWT_SECRET=$(openssl rand -base64 32)
+    VISION_HMAC_SECRET=$(openssl rand -base64 32)
     
     # Write to the shared .env file
     cat > "${SHARED_ENV_FILE}" <<EOL
@@ -126,7 +139,12 @@ DISCORD_TOKEN="${DISCORD_BOT_TOKEN}"
 DISCORD_BOT_TOKEN="${DISCORD_BOT_TOKEN}"
 CLIENT_ID="${CLIENT_ID}"
 GUILD_ID="${GUILD_ID}"
+DISCORD_PUNISHMENT_WEBHOOK="${DISCORD_PUNISHMENT_WEBHOOK}"
+
+# Internal Secrets
 INTERNAL_SYNC_SECRET="${INTERNAL_SECRET}"
+VISION_JWT_SECRET="${VISION_JWT_SECRET}"
+VISION_HMAC_SECRET="${VISION_HMAC_SECRET}"
 
 # Roblox Config
 ROBLOX_API_KEY="${ROBLOX_API_KEY}"
@@ -141,9 +159,19 @@ NEXTAUTH_SECRET="${NEXTAUTH_SECRET}"
 CLERK_SECRET_KEY="${CLERK_SECRET_KEY}"
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}"
 
+# AI Services
+MISTRAL_API_KEY="${MISTRAL_API_KEY}"
+
+# External APIs
+GARMIN_API_URL="https://garminapi.ciankelly.xyz"
+GARMIN_API_KEY="${GARMIN_API_KEY}"
+
 # PostHog Analytics
-NEXT_PUBLIC_POSTHOG_KEY="REMOVED_POSTHOG_KEY"
+NEXT_PUBLIC_POSTHOG_KEY="${POSTHOG_KEY}"
 NEXT_PUBLIC_POSTHOG_HOST="https://eu.i.posthog.com"
+
+# Legal
+NEXT_PUBLIC_LEGAL_URL="https://lacrp.ciankelly.xyz/project-overwatch-legal-documents"
 EOL
     echo -e "${GREEN}New environment file created and saved in '${SHARED_DIR}/'.${NC}"
 else
@@ -156,6 +184,32 @@ else
     fi
     if ! grep -q "PORT=" "${SHARED_ENV_FILE}"; then
         echo "PORT=\"$PORT\"" >> "${SHARED_ENV_FILE}"
+    fi
+    
+    # Check for missing secrets and prompt if needed
+    if ! grep -q "VISION_JWT_SECRET=" "${SHARED_ENV_FILE}"; then
+        echo "Adding missing VISION_JWT_SECRET..."
+        echo "VISION_JWT_SECRET=\"$(openssl rand -base64 32)\"" >> "${SHARED_ENV_FILE}"
+    fi
+    if ! grep -q "VISION_HMAC_SECRET=" "${SHARED_ENV_FILE}"; then
+        echo "Adding missing VISION_HMAC_SECRET..."
+        echo "VISION_HMAC_SECRET=\"$(openssl rand -base64 32)\"" >> "${SHARED_ENV_FILE}"
+    fi
+    if ! grep -q "DISCORD_PUNISHMENT_WEBHOOK=" "${SHARED_ENV_FILE}"; then
+        read -p "Missing Discord Punishment Webhook URL: " VAL
+        echo "DISCORD_PUNISHMENT_WEBHOOK=\"$VAL\"" >> "${SHARED_ENV_FILE}"
+    fi
+    if ! grep -q "MISTRAL_API_KEY=" "${SHARED_ENV_FILE}"; then
+        read -p "Missing Mistral API Key: " VAL
+        echo "MISTRAL_API_KEY=\"$VAL\"" >> "${SHARED_ENV_FILE}"
+    fi
+    if ! grep -q "GARMIN_API_KEY=" "${SHARED_ENV_FILE}"; then
+        read -p "Missing Garmin API Key: " VAL
+        echo "GARMIN_API_KEY=\"$VAL\"" >> "${SHARED_ENV_FILE}"
+    fi
+    if ! grep -q "NEXT_PUBLIC_POSTHOG_KEY=" "${SHARED_ENV_FILE}"; then
+        read -p "Missing PostHog Project API Key: " VAL
+        echo "NEXT_PUBLIC_POSTHOG_KEY=\"$VAL\"" >> "${SHARED_ENV_FILE}"
     fi
 fi
 

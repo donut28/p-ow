@@ -19,5 +19,9 @@
     },
     "devDependencies": {
         "concurrently": "^8.2.2"
+    },
+    "dependencies": {
+        "backblaze-b2": "^1.7.1",
+        "dotenv": "^17.2.3"
     }
 }

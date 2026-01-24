@@ -154,3 +154,4 @@ vite.config.ts.timestamp-*
 .DS_Store
 vision/.DS_Store
 secrets.txt
+standalone-backup.js
