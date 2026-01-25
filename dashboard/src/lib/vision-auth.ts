@@ -1,7 +1,8 @@
 import crypto from "crypto"
 
-// Shared secret for HMAC verification - set in production
-const VISION_HMAC_SECRET = process.env.VISION_HMAC_SECRET!
+// Shared secret for HMAC verification - must match Vision desktop app
+// Fallback to hardcoded value if env var not set (for development/first deploys)
+const VISION_HMAC_SECRET = process.env.VISION_HMAC_SECRET || 'pow-vision-hmac-secret-2024'
 
 /**
  * Verifies the HMAC signature from Vision app headers.

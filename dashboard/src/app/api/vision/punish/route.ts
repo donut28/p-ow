@@ -5,16 +5,23 @@ import { PrcClient } from "@/lib/prc"
 import { getServerConfig } from "@/lib/server-config"
 import { verifyVisionSignature, visionCorsHeaders } from "@/lib/vision-auth"
 
-const VISION_SECRET = new TextEncoder().encode(
-    process.env.VISION_JWT_SECRET!
-)
-
 export async function OPTIONS() {
     return NextResponse.json({}, { headers: visionCorsHeaders })
 }
 
 export async function POST(req: Request) {
     try {
+        // Validate required environment variable
+        if (!process.env.VISION_JWT_SECRET) {
+            console.error("[Vision Punish] VISION_JWT_SECRET is not set!")
+            return NextResponse.json(
+                { error: "Server configuration error" },
+                { status: 500, headers: visionCorsHeaders }
+            )
+        }
+
+        const VISION_SECRET = new TextEncoder().encode(process.env.VISION_JWT_SECRET)
+
         // 1. Verify HMAC signature
         const signature = req.headers.get("X-Vision-Sig")
         if (!verifyVisionSignature(signature)) {

@@ -112,13 +112,6 @@ if [ ! -f "${SHARED_ENV_FILE}" ]; then
     read -p "Clerk Publishable Key: " NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
     read -p "Roblox API Key (Open Cloud): " ROBLOX_API_KEY
     read -p "Discord Punishment Webhook URL: " DISCORD_PUNISHMENT_WEBHOOK
-    read -p "Discord Bot Token: " DISCORD_BOT_TOKEN
-    read -p "Discord Client ID: " CLIENT_ID
-    read -p "Discord Guild ID: " GUILD_ID
-    read -p "Clerk Secret Key: " CLERK_SECRET_KEY
-    read -p "Clerk Publishable Key: " NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-    read -p "Roblox API Key (Open Cloud): " ROBLOX_API_KEY
-    read -p "Discord Punishment Webhook URL: " DISCORD_PUNISHMENT_WEBHOOK
     read -p "Mistral API Key: " MISTRAL_API_KEY
     read -p "Garmin API Key: " GARMIN_API_KEY
     read -p "PostHog Project API Key: " POSTHOG_KEY
@@ -126,7 +119,8 @@ if [ ! -f "${SHARED_ENV_FILE}" ]; then
     NEXTAUTH_SECRET=$(openssl rand -base64 32)
     INTERNAL_SECRET=$(openssl rand -base64 32)
     VISION_JWT_SECRET=$(openssl rand -base64 32)
-    VISION_HMAC_SECRET=$(openssl rand -base64 32)
+    # VISION_HMAC_SECRET is hardcoded to match the Vision desktop app
+    VISION_HMAC_SECRET="pow-vision-hmac-secret-2024"
     
     # Write to the shared .env file
     cat > "${SHARED_ENV_FILE}" <<EOL
@@ -187,17 +181,65 @@ else
     fi
     
     # Check for missing secrets and prompt if needed
+    echo "Checking for missing environment variables..."
+    
+    # Auto-generated secrets
     if ! grep -q "VISION_JWT_SECRET=" "${SHARED_ENV_FILE}"; then
         echo "Adding missing VISION_JWT_SECRET..."
         echo "VISION_JWT_SECRET=\"$(openssl rand -base64 32)\"" >> "${SHARED_ENV_FILE}"
     fi
+    if ! grep -q "NEXTAUTH_SECRET=" "${SHARED_ENV_FILE}"; then
+        echo "Adding missing NEXTAUTH_SECRET..."
+        echo "NEXTAUTH_SECRET=\"$(openssl rand -base64 32)\"" >> "${SHARED_ENV_FILE}"
+    fi
+    if ! grep -q "INTERNAL_SYNC_SECRET=" "${SHARED_ENV_FILE}"; then
+        echo "Adding missing INTERNAL_SYNC_SECRET..."
+        echo "INTERNAL_SYNC_SECRET=\"$(openssl rand -base64 32)\"" >> "${SHARED_ENV_FILE}"
+    fi
+    
+    # VISION_HMAC_SECRET must match the hardcoded value in the Vision desktop app
+    CORRECT_HMAC="pow-vision-hmac-secret-2024"
     if ! grep -q "VISION_HMAC_SECRET=" "${SHARED_ENV_FILE}"; then
         echo "Adding missing VISION_HMAC_SECRET..."
-        echo "VISION_HMAC_SECRET=\"$(openssl rand -base64 32)\"" >> "${SHARED_ENV_FILE}"
+        echo "VISION_HMAC_SECRET=\"${CORRECT_HMAC}\"" >> "${SHARED_ENV_FILE}"
+    elif ! grep -q "VISION_HMAC_SECRET=\"${CORRECT_HMAC}\"" "${SHARED_ENV_FILE}"; then
+        echo "Updating VISION_HMAC_SECRET to match Vision app..."
+        sed -i "s|^VISION_HMAC_SECRET=.*|VISION_HMAC_SECRET=\"${CORRECT_HMAC}\"|" "${SHARED_ENV_FILE}"
+    fi
+    
+    # Discord Config
+    if ! grep -q "DISCORD_TOKEN=" "${SHARED_ENV_FILE}" && ! grep -q "DISCORD_BOT_TOKEN=" "${SHARED_ENV_FILE}"; then
+        read -p "Missing Discord Bot Token: " VAL
+        echo "DISCORD_TOKEN=\"$VAL\"" >> "${SHARED_ENV_FILE}"
+        echo "DISCORD_BOT_TOKEN=\"$VAL\"" >> "${SHARED_ENV_FILE}"
+    fi
+    if ! grep -q "CLIENT_ID=" "${SHARED_ENV_FILE}"; then
+        read -p "Missing Discord Client ID: " VAL
+        echo "CLIENT_ID=\"$VAL\"" >> "${SHARED_ENV_FILE}"
+    fi
+    if ! grep -q "GUILD_ID=" "${SHARED_ENV_FILE}"; then
+        read -p "Missing Discord Guild ID: " VAL
+        echo "GUILD_ID=\"$VAL\"" >> "${SHARED_ENV_FILE}"
     fi
     if ! grep -q "DISCORD_PUNISHMENT_WEBHOOK=" "${SHARED_ENV_FILE}"; then
         read -p "Missing Discord Punishment Webhook URL: " VAL
         echo "DISCORD_PUNISHMENT_WEBHOOK=\"$VAL\"" >> "${SHARED_ENV_FILE}"
+    fi
+    
+    # Clerk Auth
+    if ! grep -q "CLERK_SECRET_KEY=" "${SHARED_ENV_FILE}"; then
+        read -p "Missing Clerk Secret Key: " VAL
+        echo "CLERK_SECRET_KEY=\"$VAL\"" >> "${SHARED_ENV_FILE}"
+    fi
+    if ! grep -q "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=" "${SHARED_ENV_FILE}"; then
+        read -p "Missing Clerk Publishable Key: " VAL
+        echo "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=\"$VAL\"" >> "${SHARED_ENV_FILE}"
+    fi
+    
+    # External API Keys
+    if ! grep -q "ROBLOX_API_KEY=" "${SHARED_ENV_FILE}"; then
+        read -p "Missing Roblox API Key (Open Cloud): " VAL
+        echo "ROBLOX_API_KEY=\"$VAL\"" >> "${SHARED_ENV_FILE}"
     fi
     if ! grep -q "MISTRAL_API_KEY=" "${SHARED_ENV_FILE}"; then
         read -p "Missing Mistral API Key: " VAL
@@ -211,6 +253,28 @@ else
         read -p "Missing PostHog Project API Key: " VAL
         echo "NEXT_PUBLIC_POSTHOG_KEY=\"$VAL\"" >> "${SHARED_ENV_FILE}"
     fi
+    
+    # Auto-set URLs if missing
+    if ! grep -q "DASHBOARD_URL=" "${SHARED_ENV_FILE}"; then
+        echo "DASHBOARD_URL=\"http://127.0.0.1:${PORT}\"" >> "${SHARED_ENV_FILE}"
+    fi
+    if ! grep -q "NEXT_PUBLIC_APP_URL=" "${SHARED_ENV_FILE}"; then
+        echo "NEXT_PUBLIC_APP_URL=\"https://pow.ciankelly.xyz\"" >> "${SHARED_ENV_FILE}"
+    fi
+    if ! grep -q "NEXTAUTH_URL=" "${SHARED_ENV_FILE}"; then
+        echo "NEXTAUTH_URL=\"https://pow.ciankelly.xyz\"" >> "${SHARED_ENV_FILE}"
+    fi
+    if ! grep -q "GARMIN_API_URL=" "${SHARED_ENV_FILE}"; then
+        echo "GARMIN_API_URL=\"https://garminapi.ciankelly.xyz\"" >> "${SHARED_ENV_FILE}"
+    fi
+    if ! grep -q "NEXT_PUBLIC_POSTHOG_HOST=" "${SHARED_ENV_FILE}"; then
+        echo "NEXT_PUBLIC_POSTHOG_HOST=\"https://eu.i.posthog.com\"" >> "${SHARED_ENV_FILE}"
+    fi
+    if ! grep -q "NEXT_PUBLIC_LEGAL_URL=" "${SHARED_ENV_FILE}"; then
+        echo "NEXT_PUBLIC_LEGAL_URL=\"https://lacrp.ciankelly.xyz/project-overwatch-legal-documents\"" >> "${SHARED_ENV_FILE}"
+    fi
+    
+    echo -e "${GREEN}All required environment variables verified.${NC}"
 fi
 
 # Verify DATABASE_URL points to the correct file

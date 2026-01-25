@@ -3,11 +3,6 @@ import { getSession } from "@/lib/auth-clerk"
 import { SignJWT, jwtVerify } from "jose"
 import { verifyVisionSignature, visionCorsHeaders } from "@/lib/vision-auth"
 
-// Secret for Vision tokens - should be in env vars in production
-const VISION_SECRET = new TextEncoder().encode(
-    process.env.VISION_JWT_SECRET!
-)
-
 // Handle preflight requests
 export async function OPTIONS() {
     return NextResponse.json({}, { headers: visionCorsHeaders })
@@ -16,6 +11,16 @@ export async function OPTIONS() {
 // Generate a token for Vision app
 export async function GET(req: Request) {
     try {
+        // Validate required environment variable
+        if (!process.env.VISION_JWT_SECRET) {
+            console.error("[Vision Auth] VISION_JWT_SECRET is not set!")
+            return NextResponse.json(
+                { error: "Server configuration error" },
+                { status: 500, headers: visionCorsHeaders }
+            )
+        }
+
+        const VISION_SECRET = new TextEncoder().encode(process.env.VISION_JWT_SECRET)
         const session = await getSession()
 
         if (!session?.user) {
@@ -56,6 +61,17 @@ export async function GET(req: Request) {
 // Verify a Vision token
 export async function POST(req: Request) {
     try {
+        // Validate required environment variable
+        if (!process.env.VISION_JWT_SECRET) {
+            console.error("[Vision Auth] VISION_JWT_SECRET is not set!")
+            return NextResponse.json(
+                { error: "Server configuration error" },
+                { status: 500, headers: visionCorsHeaders }
+            )
+        }
+
+        const VISION_SECRET = new TextEncoder().encode(process.env.VISION_JWT_SECRET)
+
         // Verify the request is from Vision app using HMAC signature
         const signature = req.headers.get("X-Vision-Sig")
         if (!verifyVisionSignature(signature)) {

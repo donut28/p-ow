@@ -4,10 +4,6 @@ import { prisma } from "@/lib/db"
 import { PrcClient } from "@/lib/prc"
 import { verifyVisionSignature, visionCorsHeaders } from "@/lib/vision-auth"
 
-const VISION_SECRET = new TextEncoder().encode(
-    process.env.VISION_JWT_SECRET!
-)
-
 // Handle preflight requests
 export async function OPTIONS() {
     return NextResponse.json({}, { headers: visionCorsHeaders })
@@ -26,6 +22,17 @@ function parsePlayer(str: string | undefined): { name: string, id: string } {
 // Get all players from all servers
 export async function GET(req: Request) {
     try {
+        // Validate required environment variable
+        if (!process.env.VISION_JWT_SECRET) {
+            console.error("[Vision Users] VISION_JWT_SECRET is not set!")
+            return NextResponse.json(
+                { error: "Server configuration error" },
+                { status: 500, headers: visionCorsHeaders }
+            )
+        }
+
+        const VISION_SECRET = new TextEncoder().encode(process.env.VISION_JWT_SECRET)
+
         // Verify HMAC signature
         const signature = req.headers.get("X-Vision-Sig")
         if (!verifyVisionSignature(signature)) {

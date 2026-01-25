@@ -3,10 +3,6 @@ import { jwtVerify } from "jose"
 import { prisma } from "@/lib/db"
 import { verifyVisionSignature, visionCorsHeaders } from "@/lib/vision-auth"
 
-const VISION_SECRET = new TextEncoder().encode(
-    process.env.VISION_JWT_SECRET!
-)
-
 // Handle preflight requests
 export async function OPTIONS() {
     return NextResponse.json({}, { headers: visionCorsHeaders })
@@ -15,6 +11,17 @@ export async function OPTIONS() {
 // Lookup player by username
 export async function GET(req: Request) {
     try {
+        // Validate required environment variable
+        if (!process.env.VISION_JWT_SECRET) {
+            console.error("[Vision Player] VISION_JWT_SECRET is not set!")
+            return NextResponse.json(
+                { error: "Server configuration error" },
+                { status: 500, headers: visionCorsHeaders }
+            )
+        }
+
+        const VISION_SECRET = new TextEncoder().encode(process.env.VISION_JWT_SECRET)
+
         // Verify the request is from Vision app using HMAC signature
         const signature = req.headers.get("X-Vision-Sig")
         if (!verifyVisionSignature(signature)) {

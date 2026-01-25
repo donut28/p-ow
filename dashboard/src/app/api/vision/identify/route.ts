@@ -2,12 +2,8 @@ import { NextResponse } from "next/server"
 import { jwtVerify } from "jose"
 import { verifyVisionSignature, visionCorsHeaders } from "@/lib/vision-auth"
 
-const VISION_SECRET = new TextEncoder().encode(
-    process.env.VISION_JWT_SECRET!
-)
-
 // Mistral API Key
-const MISTRAL_API_KEY = process.env.MISTRAL_API_KEY!
+const MISTRAL_API_KEY = process.env.MISTRAL_API_KEY
 
 export async function OPTIONS() {
     return NextResponse.json({}, { headers: visionCorsHeaders })
@@ -15,6 +11,23 @@ export async function OPTIONS() {
 
 export async function POST(req: Request) {
     try {
+        // Validate required environment variables
+        if (!process.env.VISION_JWT_SECRET) {
+            console.error("[Vision Identify] VISION_JWT_SECRET is not set!")
+            return NextResponse.json(
+                { error: "Server configuration error" },
+                { status: 500, headers: visionCorsHeaders }
+            )
+        }
+        if (!MISTRAL_API_KEY) {
+            console.error("[Vision Identify] MISTRAL_API_KEY is not set!")
+            return NextResponse.json(
+                { error: "Server configuration error" },
+                { status: 500, headers: visionCorsHeaders }
+            )
+        }
+
+        const VISION_SECRET = new TextEncoder().encode(process.env.VISION_JWT_SECRET)
         // 1. Verify Request Signature (HMAC)
         const signature = req.headers.get("X-Vision-Sig")
         if (!verifyVisionSignature(signature)) {
