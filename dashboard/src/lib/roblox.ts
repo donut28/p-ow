@@ -54,21 +54,30 @@ export async function getRobloxUser(username: string): Promise<RobloxUser | null
     console.log(`[Roblox] Cache MISS for ${username}, fetching from API`)
 
     try {
-        // 2. Search for User ID
-        const searchUrl = `https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(username)}&limit=10`
-        console.log(`[Roblox] Searching for user: ${username}`)
-        console.log(`[Roblox] Search URL: ${searchUrl}`)
-        const searchRes = await fetch(
-            searchUrl,
+        // 2. Look up user by username using direct API (not fuzzy search)
+        const lookupUrl = `https://users.roblox.com/v1/usernames/users`
+        console.log(`[Roblox] Looking up username: ${username}`)
+        console.log(`[Roblox] Lookup URL: ${lookupUrl}`)
+
+        const lookupRes = await fetch(
+            lookupUrl,
             {
-                headers: { "User-Agent": "ProjectOverwatch/1.0" }
+                method: "POST",
+                headers: {
+                    "User-Agent": "ProjectOverwatch/1.0",
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    usernames: [username],
+                    excludeBannedUsers: false
+                })
             }
         )
-        console.log(`[Roblox] Search response status: ${searchRes.status}`)
+        console.log(`[Roblox] Lookup response status: ${lookupRes.status}`)
 
         // Handle rate limit - return stale cache if available
-        if (searchRes.status === 429) {
-            console.warn(`[Roblox] Rate limited searching for ${username}, trying stale cache`)
+        if (lookupRes.status === 429) {
+            console.warn(`[Roblox] Rate limited looking up ${username}, trying stale cache`)
             const stale = getFromCacheStale<RobloxUser>(cacheKey)
             if (stale) {
                 console.log(`[Roblox] Returning stale cache for ${username}`)
@@ -77,30 +86,33 @@ export async function getRobloxUser(username: string): Promise<RobloxUser | null
             return null
         }
 
-        if (!searchRes.ok) {
+        if (!lookupRes.ok) {
             try {
-                const errorBody = await searchRes.text()
-                console.error(`[Roblox] Search failed for ${username}: ${searchRes.status} ${searchRes.statusText}`)
+                const errorBody = await lookupRes.text()
+                console.error(`[Roblox] Lookup failed for ${username}: ${lookupRes.status} ${lookupRes.statusText}`)
                 console.error(`[Roblox] Error response body:`, errorBody)
             } catch (e) {
-                console.error(`[Roblox] Search failed for ${username}: ${searchRes.status} ${searchRes.statusText}`)
+                console.error(`[Roblox] Lookup failed for ${username}: ${lookupRes.status} ${lookupRes.statusText}`)
             }
             const stale = getFromCacheStale<RobloxUser>(cacheKey)
             if (stale) {
-                console.log(`[Roblox] Returning stale cache for ${username} (search failed)`)
+                console.log(`[Roblox] Returning stale cache for ${username} (lookup failed)`)
                 return stale
             }
             return null
         }
 
-        const searchData = await searchRes.json()
-        if (!searchData.data || searchData.data.length === 0) {
+        const lookupData = await lookupRes.json()
+        if (!lookupData.data || lookupData.data.length === 0) {
             console.warn(`[Roblox] No results found for username: ${username}`)
             return null
         }
 
-        const userId = searchData.data[0].id
-        console.log(`[Roblox] Found user ID ${userId} for username: ${username}`)
+        // The response returns exact username match as first result
+        const userResult = lookupData.data[0]
+        console.log(`[Roblox] Found user: ${userResult.name} (ID: ${userResult.id})`)
+
+        const userId = userResult.id
 
         // 3. Fetch Details (Open Cloud or Legacy)
         console.log(`[Roblox] Fetching details for user ${userId}`)
