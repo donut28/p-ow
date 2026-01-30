@@ -329,7 +329,8 @@ export default function EditFormPage({
                             onClick={() => setShowSettings(!showSettings)}
                             className={`p-2 rounded-lg transition-colors ${showSettings ? "bg-indigo-600 text-white" : "bg-zinc-800 text-zinc-400 hover:text-white"}`}
                         >
-                            <Settings2 className="h-5 w-5" />
+                            <Settings2 className="h-4 w-4" />
+                            <span className="hidden sm:inline">Settings</span>
                         </button>
                         <select
                             value={form.status}

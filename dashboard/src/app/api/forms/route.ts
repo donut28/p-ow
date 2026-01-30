@@ -104,8 +104,8 @@ export async function POST(request: NextRequest) {
                             description: q.description,
                             required: q.required,
                             order: qIndex,
-                            config: q.config ?? {},
-                            conditions: q.conditions ?? {}
+                            config: JSON.stringify(q.config ?? {}),
+                            conditions: JSON.stringify(q.conditions ?? {})
                         }))
                     }
                 }))
