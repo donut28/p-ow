@@ -1,7 +1,7 @@
 import { getSession } from "@/lib/auth-clerk"
 import { prisma } from "@/lib/db"
 import { redirect } from "next/navigation"
-import { Shield, Zap, MessageSquare, Briefcase, History, Filter, Search, MoreVertical, Play, Settings, Calendar } from "lucide-react"
+import { Shield, Zap, MessageSquare, Briefcase, History, Filter, Search, MoreVertical, Play, Settings, Calendar, FileText } from "lucide-react"
 import { EnsureDiscordConnection } from "@/components/auth/ensure-discord"
 import { RoleSyncWrapper } from "@/components/auth/role-sync-wrapper"
 import { ShiftButton } from "../(sidebar)/shifts/button"
@@ -278,6 +278,15 @@ export default async function ModPanelPage({
                                     >
                                         <Settings className="h-4 w-4" />
                                         Admin Panel
+                                    </Link>
+                                )}
+                                {hasAdminAccess && (
+                                    <Link
+                                        href={`/dashboard/${serverId}/forms`}
+                                        className="flex items-center gap-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20 px-4 py-2 text-sm font-medium text-indigo-400 hover:bg-indigo-500/20 transition-colors"
+                                    >
+                                        <FileText className="h-4 w-4" />
+                                        Forms
                                     </Link>
                                 )}
                                 <a href="/dashboard" className="rounded-lg bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-300 hover:bg-zinc-700 transition-colors">

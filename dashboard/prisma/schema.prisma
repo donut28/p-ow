@@ -33,6 +33,7 @@ model Server {
   leaveOfAbsences LeaveOfAbsence[]
   automations     Automation[]
   botQueue        BotQueue[]
+  forms           Form[]
 }
 
 model Log {
@@ -258,5 +259,129 @@ model CommandQueue {
 
   @@index([serverId, status])
   @@index([status, createdAt])
+}
+
+// FORMS FEATURE
+model Form {
+  id          String   @id @default(cuid())
+  serverId    String
+  server      Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  
+  // Basic Info
+  title           String
+  description     String?
+  bannerUrl       String?
+  
+  // Settings
+  status          String    @default("draft")    // draft, published, closed
+  requiresAuth    Boolean   @default(false)      // Require POW account to submit
+  isAnonymous     Boolean   @default(false)      // Hide respondent identity from admins
+  allowMultiple   Boolean   @default(true)       // Allow multiple submissions per person
+  maxResponses    Int?                           // Total response limit (null = unlimited)
+  expiresAt       DateTime?                      // Form expiration date
+  
+  // Discord Notifications
+  notifyChannelId String?                        // Discord channel for notifications
+  
+  // Sharing
+  publicShareId   String    @unique @default(cuid()) // For public share links
+  editorShareId   String    @unique @default(cuid()) // For editor access links
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdBy   String                             // Clerk user ID of creator
+  
+  sections      FormSection[]
+  responses     FormResponse[]
+  editorAccess  FormEditorAccess[]
+  
+  @@index([serverId])
+  @@index([publicShareId])
+  @@index([editorShareId])
+}
+
+model FormSection {
+  id          String   @id @default(cuid())
+  formId      String
+  form        Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
+  
+  title       String
+  description String?
+  order       Int      @default(0)
+  
+  questions   FormQuestion[]
+  
+  @@index([formId])
+}
+
+model FormQuestion {
+  id          String      @id @default(cuid())
+  sectionId   String
+  section     FormSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  
+  type        String                          // short_text, long_text, multiple_choice, checkbox, 
+                                              // dropdown, scale, date, time, file_upload
+  label       String
+  description String?
+  required    Boolean   @default(false)
+  order       Int       @default(0)
+  
+  // Options (JSON) - for choice-based questions
+  // e.g., { "options": ["Yes", "No"], "min": 1, "max": 10, "allowedTypes": ["image/*"] }
+  config      String    @default("{}")
+  
+  // Conditional Logic (JSON)
+  // e.g., { "showIf": { "questionId": "xxx", "operator": "equals", "value": "Yes" } }
+  conditions  String    @default("{}")
+  
+  answers     FormAnswer[]
+  
+  @@index([sectionId])
+}
+
+model FormResponse {
+  id          String   @id @default(cuid())
+  formId      String
+  form        Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
+  
+  respondentId    String?                      // Clerk user ID (null if anonymous/no-auth)
+  respondentEmail String?                      // Optional email for non-auth forms
+  
+  submittedAt DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+  status      String   @default("completed")    // draft, completed
+  
+  answers     FormAnswer[]
+  
+  @@index([formId])
+  @@index([respondentId])
+}
+
+model FormAnswer {
+  id          String       @id @default(cuid())
+  responseId  String
+  response    FormResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  questionId  String
+  question    FormQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  
+  // Store answer as JSON to handle all types uniformly
+  // e.g., "Hello" for text, ["Option A", "Option B"] for checkbox, { "fileUrl": "...", "fileName": "..." } for uploads
+  value       String
+  
+  @@index([responseId])
+  @@index([questionId])
+  @@unique([responseId, questionId]) // Ensure one answer per question per response
+}
+
+model FormEditorAccess {
+  id        String  @id @default(cuid())
+  formId    String
+  form      Form    @relation(fields: [formId], references: [id], onDelete: Cascade)
+  userId    String                              // Clerk user ID with editor access
+  
+  grantedAt DateTime @default(now())
+  
+  @@unique([formId, userId])
+  @@index([userId])
 }
 

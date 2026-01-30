@@ -1,0 +1,147 @@
+import { NextRequest, NextResponse } from "next/server"
+import { getSession } from "@/lib/auth-clerk"
+import { prisma } from "@/lib/db"
+import { isServerAdmin } from "@/lib/admin"
+
+// GET /api/forms?serverId=xxx - List forms for a server
+export async function GET(request: NextRequest) {
+    try {
+        const session = await getSession()
+        if (!session) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+        }
+
+        const { searchParams } = new URL(request.url)
+        const serverId = searchParams.get("serverId")
+
+        if (!serverId) {
+            return NextResponse.json({ error: "serverId is required" }, { status: 400 })
+        }
+
+        // Check if user has access to this server (any member or admin)
+        const isAdmin = await isServerAdmin(session.user, serverId)
+
+        // Get forms this user can see:
+        // - All forms if admin
+        // - Forms they have editor access to
+        // - Published forms (for filling)
+        let forms
+        if (isAdmin) {
+            forms = await prisma.form.findMany({
+                where: { serverId },
+                include: {
+                    _count: {
+                        select: { responses: true, sections: true }
+                    }
+                },
+                orderBy: { updatedAt: "desc" }
+            })
+        } else {
+            // Get forms user has editor access to
+            const editorAccess = await prisma.formEditorAccess.findMany({
+                where: { userId: session.user.id },
+                select: { formId: true }
+            })
+            const accessibleFormIds = editorAccess.map(ea => ea.formId)
+
+            forms = await prisma.form.findMany({
+                where: {
+                    serverId,
+                    OR: [
+                        { id: { in: accessibleFormIds } },
+                        { status: "published" }
+                    ]
+                },
+                include: {
+                    _count: {
+                        select: { responses: true, sections: true }
+                    }
+                },
+                orderBy: { updatedAt: "desc" }
+            })
+        }
+
+        return NextResponse.json(forms)
+    } catch (error) {
+        console.error("[FORMS GET]", error)
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    }
+}
+
+// POST /api/forms - Create new form
+export async function POST(request: NextRequest) {
+    try {
+        const session = await getSession()
+        if (!session) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+        }
+
+        const body = await request.json()
+        const { serverId, title, description, sections } = body
+
+        if (!serverId || !title) {
+            return NextResponse.json({ error: "serverId and title are required" }, { status: 400 })
+        }
+
+        // Check admin access
+        const isAdmin = await isServerAdmin(session.user, serverId)
+        if (!isAdmin) {
+            return NextResponse.json({ error: "Admin access required" }, { status: 403 })
+        }
+
+        // If sections are provided, validate/structure them for nested create
+        let sectionsCreate = {}
+        if (sections && Array.isArray(sections)) {
+            sectionsCreate = {
+                create: sections.map((section: any, index: number) => ({
+                    title: section.title || `Section ${index + 1}`,
+                    description: section.description,
+                    order: index,
+                    questions: {
+                        create: (section.questions || []).map((q: any, qIndex: number) => ({
+                            type: q.type,
+                            label: q.label,
+                            description: q.description,
+                            required: q.required,
+                            order: qIndex,
+                            config: q.config ?? {},
+                            conditions: q.conditions ?? {}
+                        }))
+                    }
+                }))
+            }
+        } else {
+            // Default single section if none provided
+            sectionsCreate = {
+                create: {
+                    title: "Section 1",
+                    order: 0
+                }
+            }
+        }
+
+        // Atomic create using Prisma transaction (implicit in .create with nested writes)
+        const form = await prisma.form.create({
+            data: {
+                serverId,
+                title,
+                description: description || null,
+                createdBy: session.user.id,
+                // @ts-ignore - Prisma nested create types can be tricky
+                sections: sectionsCreate
+            },
+            include: {
+                sections: {
+                    include: {
+                        questions: true
+                    }
+                }
+            }
+        })
+
+        return NextResponse.json(form, { status: 201 })
+    } catch (error: any) {
+        console.error("[FORMS POST]", error)
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    }
+}
