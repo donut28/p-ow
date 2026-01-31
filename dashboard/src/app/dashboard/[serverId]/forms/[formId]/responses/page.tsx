@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { ArrowLeft, Download, BarChart3, FileText, Users, Calendar, ChevronDown, ChevronUp, PieChart } from "lucide-react"
+import { ArrowLeft, Download, BarChart3, FileText, Users, Calendar, ChevronDown, ChevronUp, PieChart, Trash2 } from "lucide-react"
 
 interface Response {
     id: string
@@ -67,6 +67,7 @@ export default function ResponsesPage({
     const [error, setError] = useState<string | null>(null)
     const [expandedResponse, setExpandedResponse] = useState<string | null>(null)
     const [resolvedParams, setResolvedParams] = useState<{ serverId: string; formId: string } | null>(null)
+    const [deleting, setDeleting] = useState<string | null>(null)
 
     useEffect(() => {
         params.then(p => {
@@ -98,6 +99,44 @@ export default function ResponsesPage({
     const downloadCsv = () => {
         if (!resolvedParams) return
         window.open(`/api/forms/${resolvedParams.formId}/responses?format=csv`, "_blank")
+    }
+
+    const deleteResponse = async (responseId: string) => {
+        if (!resolvedParams || !confirm("Are you sure you want to delete this response?")) return
+        setDeleting(responseId)
+        try {
+            const res = await fetch(`/api/forms/${resolvedParams.formId}/responses?responseId=${responseId}`, {
+                method: "DELETE"
+            })
+            if (res.ok) {
+                setResponses(prev => prev.filter(r => r.id !== responseId))
+                if (analytics) {
+                    setAnalytics({ ...analytics, totalResponses: analytics.totalResponses - 1 })
+                }
+            }
+        } catch (e) {
+            console.error("Failed to delete response", e)
+        }
+        setDeleting(null)
+    }
+
+    const deleteAllResponses = async () => {
+        if (!resolvedParams || !confirm("Are you sure you want to delete ALL responses? This cannot be undone.")) return
+        setDeleting("all")
+        try {
+            const res = await fetch(`/api/forms/${resolvedParams.formId}/responses?deleteAll=true`, {
+                method: "DELETE"
+            })
+            if (res.ok) {
+                setResponses([])
+                if (analytics) {
+                    setAnalytics({ ...analytics, totalResponses: 0 })
+                }
+            }
+        } catch (e) {
+            console.error("Failed to delete all responses", e)
+        }
+        setDeleting(null)
     }
 
     if (loading) {
@@ -145,6 +184,16 @@ export default function ResponsesPage({
                         >
                             <Download className="h-4 w-4" /> Export CSV
                         </button>
+                        {responses.length > 0 && (
+                            <button
+                                onClick={deleteAllResponses}
+                                disabled={deleting === "all"}
+                                className="flex items-center gap-2 px-3 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg text-sm border border-red-600/30"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                                {deleting === "all" ? "Deleting..." : "Delete All"}
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -306,31 +355,41 @@ export default function ResponsesPage({
                                 ) : (
                                     responses.map((r) => (
                                         <div key={r.id} className="bg-[#1a1a1a] border border-[#333] rounded-xl overflow-hidden">
-                                            <button
-                                                onClick={() => setExpandedResponse(expandedResponse === r.id ? null : r.id)}
-                                                className="w-full flex items-center justify-between p-4 text-left"
-                                            >
-                                                <div>
-                                                    <p className="text-white font-medium">
-                                                        {r.respondent ? r.respondent.name : "Anonymous"}
-                                                    </p>
-                                                    <p className="text-sm text-zinc-500">
-                                                        {new Date(r.submittedAt).toLocaleString()}
-                                                    </p>
-                                                </div>
-                                                {expandedResponse === r.id ? (
-                                                    <ChevronUp className="h-5 w-5 text-zinc-500" />
-                                                ) : (
-                                                    <ChevronDown className="h-5 w-5 text-zinc-500" />
-                                                )}
-                                            </button>
+                                            <div className="flex items-center justify-between p-4">
+                                                <button
+                                                    onClick={() => setExpandedResponse(expandedResponse === r.id ? null : r.id)}
+                                                    className="flex-1 flex items-center justify-between text-left"
+                                                >
+                                                    <div>
+                                                        <p className="text-white font-medium">
+                                                            {r.respondent ? r.respondent.name : "Anonymous"}
+                                                        </p>
+                                                        <p className="text-sm text-zinc-500">
+                                                            {new Date(r.submittedAt).toLocaleString()}
+                                                        </p>
+                                                    </div>
+                                                    {expandedResponse === r.id ? (
+                                                        <ChevronUp className="h-5 w-5 text-zinc-500" />
+                                                    ) : (
+                                                        <ChevronDown className="h-5 w-5 text-zinc-500" />
+                                                    )}
+                                                </button>
+                                                <button
+                                                    onClick={() => deleteResponse(r.id)}
+                                                    disabled={deleting === r.id}
+                                                    className="ml-3 p-2 hover:bg-red-500/20 rounded-lg text-zinc-500 hover:text-red-400 transition-colors"
+                                                    title="Delete response"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
+                                            </div>
                                             {expandedResponse === r.id && (
                                                 <div className="border-t border-[#333] p-4 space-y-3">
                                                     {Object.entries(r.answers).map(([qId, answer]) => (
                                                         <div key={qId}>
-                                                            <p className="text-sm text-zinc-500">{answer.questionLabel}</p>
+                                                            <p className="text-sm text-zinc-500">{(answer as any).questionLabel}</p>
                                                             <div className="text-white">
-                                                                {renderAnswerValue(answer.value)}
+                                                                {renderAnswerValue((answer as any).value)}
                                                             </div>
                                                         </div>
                                                     ))}

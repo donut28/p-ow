@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import { ChevronRight, Shield, Zap, BarChart3, Users, Clock, FileText, ArrowRight } from "lucide-react"
+import { ChevronRight, Shield, Zap, Users, Clock, FileText, ArrowRight, Bot } from "lucide-react"
 import { useUser } from "@clerk/nextjs"
 
 export function LandingPage() {
@@ -15,6 +15,13 @@ export function LandingPage() {
         return () => window.removeEventListener("scroll", handleScroll)
     }, [])
 
+    const scrollTo = (id: string) => {
+        const element = document.getElementById(id)
+        if (element) {
+            element.scrollIntoView({ behavior: "smooth", block: "start" })
+        }
+    }
+
     return (
         <div className="min-h-screen bg-[#fafafa] text-zinc-900 font-sans antialiased">
             {/* Navigation */}
@@ -23,12 +30,12 @@ export function LandingPage() {
                 <div className="max-w-7xl mx-auto px-6 lg:px-8">
                     <div className="flex items-center justify-between h-20">
                         <div className="flex items-center gap-3">
-                            <img src="/logo.png" alt="POW" className="h-10 w-10" />
+                            <img src="/logo-black.png" alt="POW" className="h-10 w-10" />
                             <span className="text-xl font-semibold tracking-tight">Project Overwatch</span>
                         </div>
                         <div className="hidden md:flex items-center gap-8">
-                            <a href="#features" className="text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors">Features</a>
-                            <a href="#about" className="text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors">About</a>
+                            <button onClick={() => scrollTo("features")} className="text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors">Features</button>
+                            <button onClick={() => scrollTo("about")} className="text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors">About</button>
                             {isLoaded && (
                                 isSignedIn ? (
                                     <Link
@@ -84,67 +91,38 @@ export function LandingPage() {
                 />
 
                 <div className="relative z-10 max-w-5xl mx-auto px-6 pt-32 pb-20 text-center">
-                    {/* Badge */}
-                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur border border-zinc-200 rounded-full text-sm font-medium text-zinc-600 mb-8 shadow-sm">
-                        <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-                        Trusted by ERLC communities worldwide
-                    </div>
-
                     {/* Main Headline */}
-                    <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight leading-[0.9] mb-8">
-                        <span className="bg-gradient-to-r from-zinc-900 via-zinc-700 to-zinc-900 bg-clip-text text-transparent">
+                    <h1 className="text-6xl md:text-8xl lg:text-9xl font-black tracking-tighter leading-[0.85] mb-8">
+                        <span className="bg-gradient-to-r from-zinc-900 via-zinc-800 to-zinc-900 bg-clip-text text-transparent">
                             ERLC moderation
                         </span>
                         <br />
-                        <span className="bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-600 bg-clip-text text-transparent">
-                            but better™
+                        <span className="bg-gradient-to-r from-indigo-500 via-violet-500 to-purple-600 bg-clip-text text-transparent animate-gradient">
+                            but better
                         </span>
                     </h1>
 
                     {/* Subheadline */}
-                    <p className="text-xl md:text-2xl text-zinc-500 max-w-2xl mx-auto mb-12 leading-relaxed font-light">
-                        The modern, professional-grade management platform for Emergency Response: Liberty County servers.
+                    <p className="text-xl md:text-2xl text-zinc-600 max-w-2xl mx-auto mb-14 leading-relaxed">
+                        The <span className="font-semibold text-zinc-900">modern, professional-grade</span> management platform for Emergency Response: Liberty County servers.
                     </p>
 
                     {/* CTA Buttons */}
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                        <Link
-                            href="/login"
-                            className="group flex items-center gap-3 px-8 py-4 bg-zinc-900 text-white text-lg font-semibold rounded-2xl hover:bg-zinc-800 transition-all shadow-xl shadow-zinc-900/20 hover:shadow-2xl hover:shadow-zinc-900/30 hover:-translate-y-0.5"
+                        <button
+                            onClick={() => scrollTo("cta")}
+                            className="group flex items-center gap-3 px-10 py-5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-xl font-bold rounded-2xl hover:from-indigo-500 hover:to-violet-500 transition-all shadow-2xl shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:-translate-y-1 hover:scale-105"
                         >
-                            Get Started
-                            <ChevronRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                        </Link>
-                        <a
-                            href="#features"
-                            className="flex items-center gap-2 px-8 py-4 text-zinc-600 text-lg font-medium hover:text-zinc-900 transition-colors"
+                            Get Started Free
+                            <ChevronRight className="h-6 w-6 group-hover:translate-x-1 transition-transform" />
+                        </button>
+                        <button
+                            onClick={() => scrollTo("features")}
+                            className="flex items-center gap-2 px-10 py-5 text-zinc-700 text-xl font-semibold hover:text-zinc-900 transition-colors"
                         >
-                            Learn More
-                            <ArrowRight className="h-5 w-5" />
-                        </a>
-                    </div>
-
-                    {/* Hero Stats */}
-                    <div className="mt-20 grid grid-cols-3 gap-8 max-w-xl mx-auto">
-                        <div className="text-center">
-                            <div className="text-4xl md:text-5xl font-bold text-zinc-900">10K+</div>
-                            <div className="text-sm text-zinc-500 mt-1">Active Users</div>
-                        </div>
-                        <div className="text-center">
-                            <div className="text-4xl md:text-5xl font-bold text-zinc-900">500+</div>
-                            <div className="text-sm text-zinc-500 mt-1">Communities</div>
-                        </div>
-                        <div className="text-center">
-                            <div className="text-4xl md:text-5xl font-bold text-zinc-900">99.9%</div>
-                            <div className="text-sm text-zinc-500 mt-1">Uptime</div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Scroll Indicator */}
-                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
-                    <div className="w-8 h-12 border-2 border-zinc-300 rounded-full flex items-start justify-center p-2">
-                        <div className="w-1.5 h-3 bg-zinc-400 rounded-full animate-pulse" />
+                            See Features
+                            <ArrowRight className="h-6 w-6" />
+                        </button>
                     </div>
                 </div>
             </section>
@@ -187,14 +165,14 @@ export function LandingPage() {
                             </p>
                         </div>
 
-                        {/* Card 3 */}
+                        {/* Card 3 - Bot */}
                         <div className="group p-8 bg-gradient-to-br from-zinc-50 to-zinc-100/50 rounded-3xl border border-zinc-200 hover:border-zinc-300 transition-all hover:-translate-y-1 hover:shadow-xl">
                             <div className="w-14 h-14 bg-gradient-to-br from-pink-500 to-rose-500 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                                <BarChart3 className="h-7 w-7 text-white" />
+                                <Bot className="h-7 w-7 text-white" />
                             </div>
-                            <h3 className="text-xl font-semibold mb-3">Analytics</h3>
+                            <h3 className="text-xl font-semibold mb-3">Discord Bot</h3>
                             <p className="text-zinc-500 leading-relaxed">
-                                Comprehensive server analytics. Track player counts, moderation actions, and identify trends over time.
+                                Powerful Discord bot with commands for moderation, lookups, and server management. Seamlessly integrated.
                             </p>
                         </div>
 
@@ -273,7 +251,7 @@ export function LandingPage() {
             </section>
 
             {/* CTA Section */}
-            <section className="py-32 bg-gradient-to-br from-indigo-600 via-violet-600 to-indigo-700 relative overflow-hidden">
+            <section id="cta" className="py-32 bg-gradient-to-br from-indigo-600 via-violet-600 to-indigo-700 relative overflow-hidden">
                 {/* Background Pattern */}
                 <div className="absolute inset-0 opacity-10">
                     <div className="absolute inset-0" style={{
@@ -283,20 +261,10 @@ export function LandingPage() {
                 </div>
 
                 <div className="relative z-10 max-w-4xl mx-auto px-6 lg:px-8 text-center">
-                    <h2 className="text-4xl md:text-6xl font-bold text-white tracking-tight mb-6">
+                    <h2 className="text-4xl md:text-6xl font-bold text-white tracking-tight mb-10">
                         Ready to level up your server?
                     </h2>
-                    <p className="text-xl text-white/80 mb-10">
-                        Join thousands of communities already using Project Overwatch.
-                    </p>
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                        <Link
-                            href="/login"
-                            className="inline-flex items-center gap-3 px-10 py-5 bg-white text-zinc-900 text-lg font-semibold rounded-2xl hover:bg-zinc-100 transition-all shadow-2xl hover:-translate-y-1"
-                        >
-                            Start Now — It's Free
-                            <ChevronRight className="h-5 w-5" />
-                        </Link>
                         <a
                             href="https://discord.gg/lacomm"
                             target="_blank"

@@ -183,3 +183,65 @@ export async function GET(
         return NextResponse.json({ error: "Internal server error" }, { status: 500 })
     }
 }
+
+// DELETE /api/forms/[formId]/responses - Delete response(s)
+export async function DELETE(
+    request: NextRequest,
+    { params }: { params: Promise<{ formId: string }> }
+) {
+    try {
+        const session = await getSession()
+        if (!session) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+        }
+
+        const { formId } = await params
+
+        const canView = await canViewResponses(session.user, formId)
+        if (!canView) {
+            return NextResponse.json({ error: "Access denied" }, { status: 403 })
+        }
+
+        const { searchParams } = new URL(request.url)
+        const responseId = searchParams.get("responseId")
+        const deleteAll = searchParams.get("deleteAll") === "true"
+
+        if (deleteAll) {
+            // Delete all responses for this form
+            const deleted = await prisma.formResponse.deleteMany({
+                where: { formId }
+            })
+            return NextResponse.json({
+                success: true,
+                deleted: deleted.count,
+                message: `Deleted ${deleted.count} responses`
+            })
+        }
+
+        if (responseId) {
+            // Delete single response
+            const response = await prisma.formResponse.findUnique({
+                where: { id: responseId },
+                select: { formId: true }
+            })
+
+            if (!response || response.formId !== formId) {
+                return NextResponse.json({ error: "Response not found" }, { status: 404 })
+            }
+
+            await prisma.formResponse.delete({
+                where: { id: responseId }
+            })
+
+            return NextResponse.json({
+                success: true,
+                message: "Response deleted"
+            })
+        }
+
+        return NextResponse.json({ error: "Specify responseId or deleteAll=true" }, { status: 400 })
+    } catch (error) {
+        console.error("[RESPONSES DELETE]", error)
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    }
+}
