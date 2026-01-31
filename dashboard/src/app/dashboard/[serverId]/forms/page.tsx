@@ -43,14 +43,14 @@ export default async function FormsPage({
     })
 
     return (
-        <div className="min-h-screen bg-[#111] p-6 flex flex-col">
-            {/* Branding Header */}
-            <div className="max-w-6xl mx-auto w-full mb-6 flex items-center gap-2">
+        <div className="min-h-screen bg-[#111] flex flex-col">
+            {/* Branding Header - Fixed at top */}
+            <div className="w-full px-6 py-4 flex items-center gap-2">
                 <img src="/logo.png" alt="POW" className="h-8 w-8 opacity-70" />
                 <span className="text-white/70 text-sm font-medium">Project Overwatch</span>
             </div>
 
-            <div className="max-w-6xl mx-auto space-y-6 flex-1">
+            <div className="max-w-6xl mx-auto px-6 pb-6 space-y-6 flex-1 w-full">
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div>
