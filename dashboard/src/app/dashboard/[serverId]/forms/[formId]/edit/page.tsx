@@ -39,7 +39,21 @@ interface Form {
     publicShareId: string
     editorShareId: string
     sections: Section[]
+    thankYouMessage: string | null
+    requiredRoleIds: string[] // Parsed from JSON
+    ignoredRoleIds: string[]  // Parsed from JSON
     _count: { responses: number }
+}
+
+interface DiscordRole {
+    id: string
+    name: string
+    color: number
+}
+
+interface DiscordChannel {
+    id: string
+    name: string
 }
 
 const QUESTION_TYPES = [
@@ -69,12 +83,30 @@ export default function EditFormPage({
     const [copied, setCopied] = useState<string | null>(null)
     const [resolvedParams, setResolvedParams] = useState<{ serverId: string; formId: string } | null>(null)
 
+    const [availableRoles, setAvailableRoles] = useState<DiscordRole[]>([])
+    const [availableChannels, setAvailableChannels] = useState<DiscordChannel[]>([])
+
     useEffect(() => {
         params.then(p => {
             setResolvedParams(p)
             loadForm(p.formId)
+            loadDiscordData(p.serverId)
         })
     }, [params])
+
+    const loadDiscordData = async (serverId: string) => {
+        try {
+            const [rolesRes, channelsRes] = await Promise.all([
+                fetch(`/api/discord/roles?serverId=${serverId}`),
+                fetch(`/api/discord/channels?serverId=${serverId}`)
+            ])
+
+            if (rolesRes.ok) setAvailableRoles(await rolesRes.json())
+            if (channelsRes.ok) setAvailableChannels(await channelsRes.json())
+        } catch (e) {
+            console.error("Failed to load Discord data", e)
+        }
+    }
 
     const loadForm = async (formId: string) => {
         try {
@@ -83,16 +115,27 @@ export default function EditFormPage({
             const data = await res.json()
 
             // Parse JSON fields safely
+            const safeJSONParse = (str: any, fallback: any) => {
+                if (!str) return fallback
+                try {
+                    return typeof str === "string" ? JSON.parse(str) : str
+                } catch {
+                    return fallback
+                }
+            }
+
             const parsedForm: Form = {
                 ...data,
                 sections: data.sections.map((s: Section) => ({
                     ...s,
                     questions: s.questions.map((q: Question) => ({
                         ...q,
-                        config: typeof q.config === "string" ? JSON.parse(q.config as unknown as string) : q.config,
-                        conditions: typeof q.conditions === "string" ? JSON.parse(q.conditions as unknown as string) : q.conditions
+                        config: safeJSONParse(q.config, {}),
+                        conditions: safeJSONParse(q.conditions, {})
                     }))
-                }))
+                })),
+                requiredRoleIds: safeJSONParse(data.requiredRoleIds, []),
+                ignoredRoleIds: safeJSONParse(data.ignoredRoleIds, [])
             }
             setForm(parsedForm)
         } catch (e: any) {
@@ -303,7 +346,7 @@ export default function EditFormPage({
                                     }`}>
                                     {form.status}
                                 </span>
-                                <span className="text-zinc-500">{form._count.responses} responses</span>
+                                {form._count && <span className="text-zinc-500">{form._count.responses} responses</span>}
                                 <div className="w-px h-3 bg-[#333]"></div>
                                 {saving ? (
                                     <span className="text-indigo-400 animate-pulse">Saving...</span>
@@ -330,7 +373,7 @@ export default function EditFormPage({
                             className={`p-2 rounded-lg transition-colors ${showSettings ? "bg-indigo-600 text-white" : "bg-zinc-800 text-zinc-400 hover:text-white"}`}
                         >
                             <Settings2 className="h-4 w-4" />
-                            <span className="hidden sm:inline">Settings</span>
+                            <span className="hidden sm:inline whitespace-nowrap">Settings</span>
                         </button>
                         <select
                             value={form.status}
@@ -347,16 +390,24 @@ export default function EditFormPage({
 
             <div className="max-w-4xl mx-auto p-6 space-y-6">
                 {/* Settings Panel */}
-                {showSettings && (
+                {showSettings ? (
                     <div className="bg-[#1a1a1a] border border-[#333] rounded-xl p-6 space-y-6">
-                        <h3 className="text-lg font-semibold text-white">Form Settings</h3>
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-lg font-semibold text-white">Form Settings</h3>
+                            <button
+                                onClick={() => setShowSettings(false)}
+                                className="text-sm text-zinc-400 hover:text-white"
+                            >
+                                Close Settings
+                            </button>
+                        </div>
 
                         {/* Sharing */}
                         <div className="space-y-3">
                             <h4 className="text-sm font-medium text-zinc-400">Share Links</h4>
                             <div className="space-y-2">
+                                <p className="text-sm text-white mb-1">Public Link</p>
                                 <div className="flex items-center gap-2">
-                                    <span className="text-sm text-zinc-500 w-24">Public:</span>
                                     <input
                                         type="text"
                                         readOnly
@@ -373,352 +424,437 @@ export default function EditFormPage({
                                         <ExternalLink className="h-4 w-4 text-zinc-400" />
                                     </a>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-sm text-zinc-500 w-24">Editor:</span>
+                                <div className="space-y-2">
+                                    <p className="text-sm text-white mb-1">Editor Link (Grants edit access)</p>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="text"
+                                            readOnly
+                                            value={editorUrl}
+                                            className="flex-1 bg-[#222] px-3 py-2 rounded text-sm text-zinc-300 outline-none"
+                                        />
+                                        <button
+                                            onClick={() => copyToClipboard(editorUrl, "editor")}
+                                            className="p-2 bg-zinc-700 hover:bg-zinc-600 rounded"
+                                        >
+                                            {copied === "editor" ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4 text-zinc-400" />}
+                                        </button>
+                                    </div>
+                                    <p className="text-xs text-zinc-600">Editor link grants edit access to POW users who open it</p>
+                                </div>
+                            </div>
+
+                            {/* Options Grid */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <label className="flex items-center gap-3 bg-[#222] p-3 rounded-lg cursor-pointer">
                                     <input
-                                        type="text"
-                                        readOnly
-                                        value={editorUrl}
-                                        className="flex-1 bg-[#222] px-3 py-2 rounded text-sm text-zinc-300 outline-none"
+                                        type="checkbox"
+                                        checked={form.requiresAuth}
+                                        onChange={(e) => saveForm({ requiresAuth: e.target.checked })}
+                                        className="rounded"
                                     />
-                                    <button
-                                        onClick={() => copyToClipboard(editorUrl, "editor")}
-                                        className="p-2 bg-zinc-700 hover:bg-zinc-600 rounded"
-                                    >
-                                        {copied === "editor" ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4 text-zinc-400" />}
-                                    </button>
+                                    <div>
+                                        <p className="text-sm text-white">Require login</p>
+                                        <p className="text-xs text-zinc-500">Users must have POW account</p>
+                                    </div>
+                                </label>
+                                <label className="flex items-center gap-3 bg-[#222] p-3 rounded-lg cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={form.isAnonymous}
+                                        onChange={(e) => saveForm({ isAnonymous: e.target.checked })}
+                                        className="rounded"
+                                    />
+                                    <div>
+                                        <p className="text-sm text-white">Anonymous responses</p>
+                                        <p className="text-xs text-zinc-500">Hide respondent identity</p>
+                                    </div>
+                                </label>
+                                <label className="flex items-center gap-3 bg-[#222] p-3 rounded-lg cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={form.allowMultiple}
+                                        onChange={(e) => saveForm({ allowMultiple: e.target.checked })}
+                                        className="rounded"
+                                    />
+                                    <div>
+                                        <p className="text-sm text-white">Allow multiple</p>
+                                        <p className="text-xs text-zinc-500">Users can submit more than once</p>
+                                    </div>
+                                </label>
+                                <div className="bg-[#222] p-3 rounded-lg">
+                                    <p className="text-sm text-white mb-1">Max responses</p>
+                                    <input
+                                        type="number"
+                                        value={form.maxResponses || ""}
+                                        onChange={(e) => saveForm({ maxResponses: e.target.value ? parseInt(e.target.value) : null })}
+                                        placeholder="Unlimited"
+                                        className="w-full bg-[#1a1a1a] px-2 py-1 rounded text-sm text-white outline-none"
+                                    />
                                 </div>
-                                <p className="text-xs text-zinc-600">Editor link grants edit access to POW users who open it</p>
                             </div>
-                        </div>
 
-                        {/* Options Grid */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <label className="flex items-center gap-3 bg-[#222] p-3 rounded-lg cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={form.requiresAuth}
-                                    onChange={(e) => saveForm({ requiresAuth: e.target.checked })}
-                                    className="rounded"
-                                />
-                                <div>
-                                    <p className="text-sm text-white">Require login</p>
-                                    <p className="text-xs text-zinc-500">Users must have POW account</p>
-                                </div>
-                            </label>
-                            <label className="flex items-center gap-3 bg-[#222] p-3 rounded-lg cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={form.isAnonymous}
-                                    onChange={(e) => saveForm({ isAnonymous: e.target.checked })}
-                                    className="rounded"
-                                />
-                                <div>
-                                    <p className="text-sm text-white">Anonymous responses</p>
-                                    <p className="text-xs text-zinc-500">Hide respondent identity</p>
-                                </div>
-                            </label>
-                            <label className="flex items-center gap-3 bg-[#222] p-3 rounded-lg cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={form.allowMultiple}
-                                    onChange={(e) => saveForm({ allowMultiple: e.target.checked })}
-                                    className="rounded"
-                                />
-                                <div>
-                                    <p className="text-sm text-white">Allow multiple</p>
-                                    <p className="text-xs text-zinc-500">Users can submit more than once</p>
-                                </div>
-                            </label>
+                            {/* Expiration */}
                             <div className="bg-[#222] p-3 rounded-lg">
-                                <p className="text-sm text-white mb-1">Max responses</p>
+                                <p className="text-sm text-white mb-2">Expiration date</p>
                                 <input
-                                    type="number"
-                                    value={form.maxResponses || ""}
-                                    onChange={(e) => saveForm({ maxResponses: e.target.value ? parseInt(e.target.value) : null })}
-                                    placeholder="Unlimited"
-                                    className="w-full bg-[#1a1a1a] px-2 py-1 rounded text-sm text-white outline-none"
+                                    type="datetime-local"
+                                    value={form.expiresAt ? new Date(form.expiresAt).toISOString().slice(0, 16) : ""}
+                                    onChange={(e) => saveForm({ expiresAt: e.target.value || null })}
+                                    className="bg-[#1a1a1a] px-3 py-2 rounded text-sm text-white outline-none"
                                 />
                             </div>
+
+                            {/* Discord Integration */}
+                            <div className="space-y-4 pt-4 border-t border-[#333]">
+                                <h4 className="text-sm font-medium text-white">Discord Integration</h4>
+
+                                {/* Notification Channel */}
+                                <div className="bg-[#222] p-3 rounded-lg">
+                                    <p className="text-sm text-white mb-2">Notification Channel</p>
+                                    <select
+                                        value={form.notifyChannelId || ""}
+                                        onChange={(e) => {
+                                            const val = e.target.value || null
+                                            setForm({ ...form, notifyChannelId: val })
+                                            saveForm({ notifyChannelId: val })
+                                        }}
+                                        className="w-full bg-[#1a1a1a] px-3 py-2 rounded text-sm text-white outline-none"
+                                    >
+                                        <option value="">Select a channel...</option>
+                                        {availableChannels.map(c => (
+                                            <option key={c.id} value={c.id}>#{c.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Role Gating */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="bg-[#222] p-3 rounded-lg">
+                                        <p className="text-sm text-white mb-2">Required Roles (Whitelist)</p>
+                                        <p className="text-xs text-zinc-500 mb-2">User MUST have one of these roles</p>
+                                        <div className="max-h-40 overflow-y-auto space-y-1 bg-[#1a1a1a] p-2 rounded">
+                                            {availableRoles.map(role => (
+                                                <label key={role.id} className="flex items-center gap-2 p-1 hover:bg-[#252525] rounded cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={form.requiredRoleIds?.includes(role.id)}
+                                                        onChange={(e) => {
+                                                            const newRoles = e.target.checked
+                                                                ? [...(form.requiredRoleIds || []), role.id]
+                                                                : (form.requiredRoleIds || []).filter(r => r !== role.id)
+                                                            setForm({ ...form, requiredRoleIds: newRoles })
+                                                            saveForm({ requiredRoleIds: newRoles as any }) // Cast for API
+                                                        }}
+                                                        className="rounded border-zinc-600"
+                                                    />
+                                                    <span className="text-sm truncate" style={{ color: role.color ? `#${role.color.toString(16)}` : '#ccc' }}>
+                                                        {role.name}
+                                                    </span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-[#222] p-3 rounded-lg">
+                                        <p className="text-sm text-white mb-2">Ignored Roles (Blacklist)</p>
+                                        <p className="text-xs text-zinc-500 mb-2">User MUST NOT have these roles</p>
+                                        <div className="max-h-40 overflow-y-auto space-y-1 bg-[#1a1a1a] p-2 rounded">
+                                            {availableRoles.map(role => (
+                                                <label key={role.id} className="flex items-center gap-2 p-1 hover:bg-[#252525] rounded cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={form.ignoredRoleIds?.includes(role.id)}
+                                                        onChange={(e) => {
+                                                            const newRoles = e.target.checked
+                                                                ? [...(form.ignoredRoleIds || []), role.id]
+                                                                : (form.ignoredRoleIds || []).filter(r => r !== role.id)
+                                                            setForm({ ...form, ignoredRoleIds: newRoles })
+                                                            saveForm({ ignoredRoleIds: newRoles as any })
+                                                        }}
+                                                        className="rounded border-zinc-600"
+                                                    />
+                                                    <span className="text-sm truncate" style={{ color: role.color ? `#${role.color.toString(16)}` : '#ccc' }}>
+                                                        {role.name}
+                                                    </span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Post-Submission */}
+                            <div className="space-y-4 pt-4 border-t border-[#333]">
+                                <h4 className="text-sm font-medium text-white">Post-Submission</h4>
+                                <div className="bg-[#222] p-3 rounded-lg">
+                                    <p className="text-sm text-white mb-2">Custom Thank You Message</p>
+                                    <textarea
+                                        value={form.thankYouMessage || ""}
+                                        onChange={(e) => setForm({ ...form, thankYouMessage: e.target.value || null })}
+                                        onBlur={() => saveForm({ thankYouMessage: form.thankYouMessage })}
+                                        placeholder="Thanks for submitting! We have received your response."
+                                        className="w-full bg-[#1a1a1a] px-3 py-2 rounded text-sm text-white outline-none resize-none"
+                                        rows={2}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Delete */}
+                            <button
+                                onClick={deleteForm}
+                                className="flex items-center gap-2 px-4 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg text-sm"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                                Delete Form
+                            </button>
                         </div>
+                        ) : (
+                        <>
 
-                        {/* Expiration */}
-                        <div className="bg-[#222] p-3 rounded-lg">
-                            <p className="text-sm text-white mb-2">Expiration date</p>
-                            <input
-                                type="datetime-local"
-                                value={form.expiresAt ? new Date(form.expiresAt).toISOString().slice(0, 16) : ""}
-                                onChange={(e) => saveForm({ expiresAt: e.target.value || null })}
-                                className="bg-[#1a1a1a] px-3 py-2 rounded text-sm text-white outline-none"
-                            />
-                        </div>
-
-                        {/* Discord Channel */}
-                        <div className="bg-[#222] p-3 rounded-lg">
-                            <p className="text-sm text-white mb-2">Discord notification channel ID</p>
-                            <input
-                                type="text"
-                                value={form.notifyChannelId || ""}
-                                onChange={(e) => setForm({ ...form, notifyChannelId: e.target.value || null })}
-                                onBlur={() => saveForm({ notifyChannelId: form.notifyChannelId })}
-                                placeholder="Enter channel ID for notifications"
-                                className="w-full bg-[#1a1a1a] px-3 py-2 rounded text-sm text-white outline-none"
-                            />
-                        </div>
-
-                        {/* Delete */}
-                        <button
-                            onClick={deleteForm}
-                            className="flex items-center gap-2 px-4 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg text-sm"
-                        >
-                            <Trash2 className="h-4 w-4" />
-                            Delete Form
-                        </button>
-                    </div>
-                )}
-
-                {/* Description */}
-                <div className="bg-[#1a1a1a] border border-[#333] rounded-xl p-4">
-                    <textarea
-                        value={form.description || ""}
-                        onChange={(e) => setForm({ ...form, description: e.target.value })}
-                        onBlur={() => saveForm({ description: form.description })}
-                        placeholder="Add a description..."
-                        className="w-full bg-transparent text-zinc-400 placeholder:text-zinc-600 outline-none resize-none"
-                        rows={2}
-                    />
-                </div>
-
-                {/* Sections */}
-                {form.sections.map((section) => (
-                    <div key={section.id} className="bg-[#1a1a1a] border border-[#333] rounded-xl overflow-hidden">
-                        <div className="flex items-center gap-3 p-4 border-b border-[#333] bg-[#222]">
-                            <GripVertical className="h-4 w-4 text-zinc-600" />
-                            <input
-                                type="text"
-                                value={section.title}
-                                onChange={(e) => updateSection(section.id, { title: e.target.value })}
-                                className="flex-1 bg-transparent text-lg font-semibold text-white outline-none"
-                            />
-                            {form.sections.length > 1 && (
-                                <button onClick={() => deleteSection(section.id)} className="p-2 text-zinc-500 hover:text-red-400">
-                                    <Trash2 className="h-4 w-4" />
-                                </button>
-                            )}
-                        </div>
-
-                        <div className="px-4 py-2 border-b border-[#333]">
-                            <input
-                                type="text"
-                                placeholder="Section description (optional)"
-                                value={section.description || ""}
-                                onChange={(e) => updateSection(section.id, { description: e.target.value })}
-                                className="w-full bg-transparent text-sm text-zinc-400 placeholder:text-zinc-600 outline-none"
-                            />
-                        </div>
-
-                        <div className="p-4 space-y-4">
-                            {section.questions.map((q) => (
-                                <QuestionCard
-                                    key={q.id}
-                                    question={q}
-                                    allQuestions={form.sections.flatMap(s => s.questions.filter(qq => qq.id !== q.id))}
-                                    onUpdate={(updates) => updateQuestion(q.id, updates)}
-                                    onDelete={() => deleteQuestion(q.id)}
+                            {/* Description */}
+                            <div className="bg-[#1a1a1a] border border-[#333] rounded-xl p-4">
+                                <textarea
+                                    value={form.description || ""}
+                                    onChange={(e) => setForm({ ...form, description: e.target.value })}
+                                    onBlur={() => saveForm({ description: form.description })}
+                                    placeholder="Add a description..."
+                                    className="w-full bg-transparent text-zinc-400 placeholder:text-zinc-600 outline-none resize-none"
+                                    rows={2}
                                 />
+                            </div>
+
+                            {/* Sections */}
+                            {form.sections.map((section) => (
+                                <div key={section.id} className="bg-[#1a1a1a] border border-[#333] rounded-xl overflow-hidden">
+                                    <div className="flex items-center gap-3 p-4 border-b border-[#333] bg-[#222]">
+                                        <GripVertical className="h-4 w-4 text-zinc-600" />
+                                        <input
+                                            type="text"
+                                            value={section.title}
+                                            onChange={(e) => updateSection(section.id, { title: e.target.value })}
+                                            className="flex-1 bg-transparent text-lg font-semibold text-white outline-none"
+                                        />
+                                        {form.sections.length > 1 && (
+                                            <button onClick={() => deleteSection(section.id)} className="p-2 text-zinc-500 hover:text-red-400">
+                                                <Trash2 className="h-4 w-4" />
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    <div className="px-4 py-2 border-b border-[#333]">
+                                        <input
+                                            type="text"
+                                            placeholder="Section description (optional)"
+                                            value={section.description || ""}
+                                            onChange={(e) => updateSection(section.id, { description: e.target.value })}
+                                            className="w-full bg-transparent text-sm text-zinc-400 placeholder:text-zinc-600 outline-none"
+                                        />
+                                    </div>
+
+                                    <div className="p-4 space-y-4">
+                                        {section.questions.map((q) => (
+                                            <QuestionCard
+                                                key={q.id}
+                                                question={q}
+                                                allQuestions={form.sections.flatMap(s => s.questions.filter(qq => qq.id !== q.id))}
+                                                onUpdate={(updates) => updateQuestion(q.id, updates)}
+                                                onDelete={() => deleteQuestion(q.id)}
+                                            />
+                                        ))}
+
+                                        <div className="flex flex-wrap gap-2 pt-2">
+                                            {QUESTION_TYPES.map((type) => (
+                                                <button
+                                                    key={type.value}
+                                                    onClick={() => addQuestion(section.id, type.value)}
+                                                    className="flex items-center gap-2 px-3 py-2 bg-[#222] hover:bg-[#333] text-zinc-400 hover:text-white rounded-lg text-sm transition-colors"
+                                                >
+                                                    <span>{type.icon}</span>
+                                                    {type.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
                             ))}
 
-                            <div className="flex flex-wrap gap-2 pt-2">
-                                {QUESTION_TYPES.map((type) => (
-                                    <button
-                                        key={type.value}
-                                        onClick={() => addQuestion(section.id, type.value)}
-                                        className="flex items-center gap-2 px-3 py-2 bg-[#222] hover:bg-[#333] text-zinc-400 hover:text-white rounded-lg text-sm transition-colors"
-                                    >
-                                        <span>{type.icon}</span>
-                                        {type.label}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
+                            <button
+                                onClick={addSection}
+                                className="w-full flex items-center justify-center gap-2 p-4 border-2 border-dashed border-[#333] hover:border-[#555] rounded-xl text-zinc-500 hover:text-white transition-colors"
+                            >
+                                Add Section
+                            </button>
+                        </>
+                )}
                     </div>
-                ))}
-
-                <button
-                    onClick={addSection}
-                    className="w-full flex items-center justify-center gap-2 p-4 border-2 border-dashed border-[#333] hover:border-[#555] rounded-xl text-zinc-500 hover:text-white transition-colors"
-                >
-                    <Plus className="h-5 w-5" />
-                    Add Section
-                </button>
-            </div>
         </div>
-    )
+            )
 }
 
-function QuestionCard({
-    question,
-    allQuestions,
-    onUpdate,
-    onDelete
-}: {
-    question: Question
-    allQuestions: Question[]
-    onUpdate: (updates: Partial<Question>) => void
-    onDelete: () => void
-}) {
+            function QuestionCard({
+                question,
+                allQuestions,
+                onUpdate,
+                onDelete
+            }: {
+                question: Question
+            allQuestions: Question[]
+            onUpdate: (updates: Partial<Question>) => void
+                onDelete: () => void
+            }) {
     const [showConditions, setShowConditions] = useState(!!question.conditions?.showIf)
 
     const updateOption = (index: number, value: string) => {
         const options = [...(question.config.options || [])]
-        options[index] = value
-        onUpdate({ config: { ...question.config, options } })
+                options[index] = value
+                onUpdate({config: {...question.config, options} })
     }
 
     const addOption = () => {
         const options = [...(question.config.options || []), `Option ${(question.config.options?.length || 0) + 1}`]
-        onUpdate({ config: { ...question.config, options } })
+                onUpdate({config: {...question.config, options} })
     }
 
     const removeOption = (index: number) => {
         const options = [...(question.config.options || [])]
-        options.splice(index, 1)
-        onUpdate({ config: { ...question.config, options } })
+                options.splice(index, 1)
+                onUpdate({config: {...question.config, options} })
     }
 
-    return (
-        <div className="bg-[#252525] border border-[#3a3a3a] rounded-lg p-4 space-y-3">
-            <div className="flex items-start gap-3">
-                <GripVertical className="h-4 w-4 text-zinc-600 mt-2" />
-                <div className="flex-1 space-y-2">
-                    <input
-                        type="text"
-                        value={question.label}
-                        onChange={(e) => onUpdate({ label: e.target.value })}
-                        className="w-full bg-transparent text-white font-medium outline-none"
-                    />
-                    <input
-                        type="text"
-                        value={question.description || ""}
-                        onChange={(e) => onUpdate({ description: e.target.value })}
-                        className="w-full bg-transparent text-sm text-zinc-500 outline-none"
-                        placeholder="Description (optional)"
-                    />
-                </div>
-                <button
-                    onClick={() => setShowConditions(!showConditions)}
-                    className={`p-2 rounded ${showConditions ? "bg-indigo-600 text-white" : "text-zinc-500 hover:text-white"}`}
-                >
-                    <Settings2 className="h-4 w-4" />
-                </button>
-                <button onClick={onDelete} className="p-2 text-zinc-500 hover:text-red-400">
-                    <Trash2 className="h-4 w-4" />
-                </button>
-            </div>
-
-            {(question.type === "multiple_choice" || question.type === "checkbox" || question.type === "dropdown") && (
-                <div className="pl-7 space-y-2">
-                    {(question.config.options || []).map((opt: string, i: number) => (
-                        <div key={i} className="flex items-center gap-2">
-                            <span className="text-zinc-500">{question.type === "checkbox" ? "☐" : "○"}</span>
+                return (
+                <div className="bg-[#252525] border border-[#3a3a3a] rounded-lg p-4 space-y-3">
+                    <div className="flex items-start gap-3">
+                        <GripVertical className="h-4 w-4 text-zinc-600 mt-2" />
+                        <div className="flex-1 space-y-2">
                             <input
                                 type="text"
-                                value={opt}
-                                onChange={(e) => updateOption(i, e.target.value)}
-                                className="flex-1 bg-[#1a1a1a] px-3 py-1.5 rounded text-sm text-white outline-none"
+                                value={question.label}
+                                onChange={(e) => onUpdate({ label: e.target.value })}
+                                className="w-full bg-transparent text-white font-medium outline-none"
                             />
-                            <button onClick={() => removeOption(i)} className="text-zinc-600 hover:text-red-400">
-                                <Trash2 className="h-3 w-3" />
+                            <input
+                                type="text"
+                                value={question.description || ""}
+                                onChange={(e) => onUpdate({ description: e.target.value })}
+                                className="w-full bg-transparent text-sm text-zinc-500 outline-none"
+                                placeholder="Description (optional)"
+                            />
+                        </div>
+                        <button
+                            onClick={() => setShowConditions(!showConditions)}
+                            className={`p-2 rounded ${showConditions ? "bg-indigo-600 text-white" : "text-zinc-500 hover:text-white"}`}
+                        >
+                            <Settings2 className="h-4 w-4" />
+                        </button>
+                        <button onClick={onDelete} className="p-2 text-zinc-500 hover:text-red-400">
+                            <Trash2 className="h-4 w-4" />
+                        </button>
+                    </div>
+
+                    {(question.type === "multiple_choice" || question.type === "checkbox" || question.type === "dropdown") && (
+                        <div className="pl-7 space-y-2">
+                            {(question.config.options || []).map((opt: string, i: number) => (
+                                <div key={i} className="flex items-center gap-2">
+                                    <span className="text-zinc-500">{question.type === "checkbox" ? "☐" : "○"}</span>
+                                    <input
+                                        type="text"
+                                        value={opt}
+                                        onChange={(e) => updateOption(i, e.target.value)}
+                                        className="flex-1 bg-[#1a1a1a] px-3 py-1.5 rounded text-sm text-white outline-none"
+                                    />
+                                    <button onClick={() => removeOption(i)} className="text-zinc-600 hover:text-red-400">
+                                        <Trash2 className="h-3 w-3" />
+                                    </button>
+                                </div>
+                            ))}
+                            <button onClick={addOption} className="flex items-center gap-1 text-sm text-zinc-500 hover:text-white">
+                                <Plus className="h-3 w-3" /> Add option
                             </button>
                         </div>
-                    ))}
-                    <button onClick={addOption} className="flex items-center gap-1 text-sm text-zinc-500 hover:text-white">
-                        <Plus className="h-3 w-3" /> Add option
-                    </button>
-                </div>
-            )}
+                    )}
 
-            {question.type === "scale" && (
-                <div className="pl-7 flex items-center gap-4 text-sm">
-                    <label className="text-zinc-500">
-                        Min:
-                        <input
-                            type="number"
-                            value={question.config.min || 1}
-                            onChange={(e) => onUpdate({ config: { ...question.config, min: parseInt(e.target.value) } })}
-                            className="ml-2 w-16 bg-[#1a1a1a] px-2 py-1 rounded text-white outline-none"
-                        />
-                    </label>
-                    <label className="text-zinc-500">
-                        Max:
-                        <input
-                            type="number"
-                            value={question.config.max || 10}
-                            onChange={(e) => onUpdate({ config: { ...question.config, max: parseInt(e.target.value) } })}
-                            className="ml-2 w-16 bg-[#1a1a1a] px-2 py-1 rounded text-white outline-none"
-                        />
-                    </label>
-                </div>
-            )}
+                    {question.type === "scale" && (
+                        <div className="pl-7 flex items-center gap-4 text-sm">
+                            <label className="text-zinc-500">
+                                Min:
+                                <input
+                                    type="number"
+                                    value={question.config.min || 1}
+                                    onChange={(e) => onUpdate({ config: { ...question.config, min: parseInt(e.target.value) } })}
+                                    className="ml-2 w-16 bg-[#1a1a1a] px-2 py-1 rounded text-white outline-none"
+                                />
+                            </label>
+                            <label className="text-zinc-500">
+                                Max:
+                                <input
+                                    type="number"
+                                    value={question.config.max || 10}
+                                    onChange={(e) => onUpdate({ config: { ...question.config, max: parseInt(e.target.value) } })}
+                                    className="ml-2 w-16 bg-[#1a1a1a] px-2 py-1 rounded text-white outline-none"
+                                />
+                            </label>
+                        </div>
+                    )}
 
-            {showConditions && (
-                <div className="pl-7 pt-2 border-t border-[#3a3a3a] space-y-2">
-                    <p className="text-xs text-zinc-500">Show this question if:</p>
-                    <div className="flex items-center gap-2 text-sm flex-wrap">
-                        <select
-                            value={question.conditions?.showIf?.questionId || ""}
-                            onChange={(e) => onUpdate({
-                                conditions: e.target.value ? {
-                                    showIf: { questionId: e.target.value, operator: "equals", value: "" }
-                                } : {}
-                            })}
-                            className="bg-[#1a1a1a] px-3 py-1.5 rounded text-white outline-none"
-                        >
-                            <option value="">Always show</option>
-                            {allQuestions.map(q => (
-                                <option key={q.id} value={q.id}>{q.label}</option>
-                            ))}
-                        </select>
-                        {question.conditions?.showIf?.questionId && (
-                            <>
+                    {showConditions && (
+                        <div className="pl-7 pt-2 border-t border-[#3a3a3a] space-y-2">
+                            <p className="text-xs text-zinc-500">Show this question if:</p>
+                            <div className="flex items-center gap-2 text-sm flex-wrap">
                                 <select
-                                    value={question.conditions.showIf.operator}
+                                    value={question.conditions?.showIf?.questionId || ""}
                                     onChange={(e) => onUpdate({
-                                        conditions: { showIf: { ...question.conditions.showIf, operator: e.target.value } }
+                                        conditions: e.target.value ? {
+                                            showIf: { questionId: e.target.value, operator: "equals", value: "" }
+                                        } : {}
                                     })}
                                     className="bg-[#1a1a1a] px-3 py-1.5 rounded text-white outline-none"
                                 >
-                                    <option value="equals">equals</option>
-                                    <option value="not_equals">does not equal</option>
-                                    <option value="contains">contains</option>
+                                    <option value="">Always show</option>
+                                    {allQuestions.map(q => (
+                                        <option key={q.id} value={q.id}>{q.label}</option>
+                                    ))}
                                 </select>
-                                <input
-                                    type="text"
-                                    value={question.conditions.showIf.value}
-                                    onChange={(e) => onUpdate({
-                                        conditions: { showIf: { ...question.conditions.showIf, value: e.target.value } }
-                                    })}
-                                    placeholder="Value"
-                                    className="flex-1 min-w-[100px] bg-[#1a1a1a] px-3 py-1.5 rounded text-white outline-none"
-                                />
-                            </>
-                        )}
+                                {question.conditions?.showIf?.questionId && (
+                                    <>
+                                        <select
+                                            value={question.conditions.showIf.operator}
+                                            onChange={(e) => onUpdate({
+                                                conditions: { showIf: { ...question.conditions.showIf, operator: e.target.value } }
+                                            })}
+                                            className="bg-[#1a1a1a] px-3 py-1.5 rounded text-white outline-none"
+                                        >
+                                            <option value="equals">equals</option>
+                                            <option value="not_equals">does not equal</option>
+                                            <option value="contains">contains</option>
+                                        </select>
+                                        <input
+                                            type="text"
+                                            value={question.conditions.showIf.value}
+                                            onChange={(e) => onUpdate({
+                                                conditions: { showIf: { ...question.conditions.showIf, value: e.target.value } }
+                                            })}
+                                            placeholder="Value"
+                                            className="flex-1 min-w-[100px] bg-[#1a1a1a] px-3 py-1.5 rounded text-white outline-none"
+                                        />
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="pl-7 pt-2 border-t border-[#3a3a3a] flex items-center justify-between">
+                        <span className="text-xs text-zinc-600">{QUESTION_TYPES.find(t => t.value === question.type)?.label}</span>
+                        <label className="flex items-center gap-2 text-sm text-zinc-400">
+                            <input
+                                type="checkbox"
+                                checked={question.required}
+                                onChange={(e) => onUpdate({ required: e.target.checked })}
+                                className="rounded"
+                            />
+                            Required
+                        </label>
                     </div>
                 </div>
-            )}
-
-            <div className="pl-7 pt-2 border-t border-[#3a3a3a] flex items-center justify-between">
-                <span className="text-xs text-zinc-600">{QUESTION_TYPES.find(t => t.value === question.type)?.label}</span>
-                <label className="flex items-center gap-2 text-sm text-zinc-400">
-                    <input
-                        type="checkbox"
-                        checked={question.required}
-                        onChange={(e) => onUpdate({ required: e.target.checked })}
-                        className="rounded"
-                    />
-                    Required
-                </label>
-            </div>
-        </div>
-    )
+                )
 }

@@ -283,6 +283,11 @@ model Form {
   // Discord Notifications
   notifyChannelId String?                        // Discord channel for notifications
   
+  // Advanced Settings
+  thankYouMessage String?                        // Custom message after submission
+  requiredRoleIds String?                        // JSON array of role IDs required to access
+  ignoredRoleIds  String?                        // JSON array of role IDs blocked from accessing
+  
   // Sharing
   publicShareId   String    @unique @default(cuid()) // For public share links
   editorShareId   String    @unique @default(cuid()) // For editor access links

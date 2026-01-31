@@ -127,6 +127,8 @@ export async function POST(request: NextRequest) {
                 title,
                 description: description || null,
                 createdBy: session.user.id,
+                publicShareId: crypto.randomUUID(),
+                editorShareId: crypto.randomUUID(), // Better than CUID for security 
                 // @ts-ignore - Prisma nested create types can be tricky
                 sections: sectionsCreate
             },

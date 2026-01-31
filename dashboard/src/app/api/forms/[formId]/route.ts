@@ -102,7 +102,10 @@ export async function PUT(
             allowMultiple,
             maxResponses,
             expiresAt,
-            notifyChannelId
+            notifyChannelId,
+            thankYouMessage,
+            requiredRoleIds,
+            ignoredRoleIds
         } = body
 
         const form = await prisma.form.update({
@@ -117,7 +120,10 @@ export async function PUT(
                 ...(allowMultiple !== undefined && { allowMultiple }),
                 ...(maxResponses !== undefined && { maxResponses }),
                 ...(expiresAt !== undefined && { expiresAt: expiresAt ? new Date(expiresAt) : null }),
-                ...(notifyChannelId !== undefined && { notifyChannelId })
+                ...(notifyChannelId !== undefined && { notifyChannelId }),
+                ...(thankYouMessage !== undefined && { thankYouMessage }),
+                ...(requiredRoleIds !== undefined && { requiredRoleIds: JSON.stringify(requiredRoleIds) }),
+                ...(ignoredRoleIds !== undefined && { ignoredRoleIds: JSON.stringify(ignoredRoleIds) })
             },
             include: {
                 sections: {
@@ -125,7 +131,8 @@ export async function PUT(
                     include: {
                         questions: { orderBy: { order: "asc" } }
                     }
-                }
+                },
+                _count: { select: { responses: true } }
             }
         })
 
