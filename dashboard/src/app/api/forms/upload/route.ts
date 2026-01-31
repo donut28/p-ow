@@ -33,8 +33,10 @@ export async function POST(request: NextRequest) {
         const uniqueId = randomBytes(16).toString("hex")
         const filename = `${uniqueId}${ext}`
 
-        // Create uploads directory if needed
-        const uploadsDir = path.join(process.cwd(), "public", "uploads", "forms", formId)
+        // Create uploads directory in data folder (persists across deploys)
+        // Use DATA_DIR env var on VPS, or fallback to local data folder for dev
+        const dataDir = process.env.DATA_DIR || path.join(process.cwd(), "data")
+        const uploadsDir = path.join(dataDir, "uploads", "forms", formId)
         await mkdir(uploadsDir, { recursive: true })
 
         // Save file
@@ -42,8 +44,8 @@ export async function POST(request: NextRequest) {
         const filePath = path.join(uploadsDir, filename)
         await writeFile(filePath, buffer)
 
-        // Return public URL
-        const fileUrl = `/uploads/forms/${formId}/${filename}`
+        // Return API URL for download (not public folder)
+        const fileUrl = `/api/forms/download?formId=${formId}&file=${filename}`
 
         return NextResponse.json({
             url: fileUrl,
