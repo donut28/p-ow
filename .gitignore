@@ -162,3 +162,4 @@ Archive.zip
 .DS_Store
 vision/.DS_Store
 .DS_Store
+dashboard/prisma/dev.db
