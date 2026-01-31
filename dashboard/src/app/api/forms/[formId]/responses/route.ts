@@ -1,21 +1,24 @@
 import { NextRequest, NextResponse } from "next/server"
+import { clerkClient } from "@clerk/nextjs/server"
 import { getSession } from "@/lib/auth-clerk"
 import { prisma } from "@/lib/db"
 import { isServerAdmin } from "@/lib/admin"
 
 // Helper to check form access
-async function canViewResponses(userId: string, formId: string): Promise<boolean> {
+async function canViewResponses(user: { id: string, discordId?: string }, formId: string): Promise<boolean> {
     const form = await prisma.form.findUnique({
         where: { id: formId },
-        select: { serverId: true }
+        select: { serverId: true, createdBy: true }
     })
     if (!form) return false
 
-    const isAdmin = await isServerAdmin({ id: userId } as any, form.serverId)
+    if (form.createdBy === user.id) return true
+
+    const isAdmin = await isServerAdmin(user as any, form.serverId)
     if (isAdmin) return true
 
     const editorAccess = await prisma.formEditorAccess.findUnique({
-        where: { formId_userId: { formId, userId } }
+        where: { formId_userId: { formId, userId: user.id } }
     })
     return !!editorAccess
 }
@@ -33,7 +36,7 @@ export async function GET(
 
         const { formId } = await params
 
-        const canView = await canViewResponses(session.user.id, formId)
+        const canView = await canViewResponses(session.user, formId)
         if (!canView) {
             return NextResponse.json({ error: "Access denied" }, { status: 403 })
         }
@@ -74,28 +77,55 @@ export async function GET(
 
         const total = await prisma.formResponse.count({ where: { formId } })
 
-        // Format responses
-        const formattedResponses = responses.map(r => ({
-            id: r.id,
-            submittedAt: r.submittedAt,
-            respondent: form.isAnonymous ? null : {
-                id: r.respondentId,
-                email: r.respondentEmail
-            },
-            answers: r.answers.reduce((acc, a) => {
-                let value
-                try {
-                    value = JSON.parse(a.value)
-                } catch {
-                    value = a.value
-                }
-                acc[a.questionId] = {
-                    questionLabel: a.question.label,
-                    value
-                }
-                return acc
-            }, {} as Record<string, any>)
+        // Collect respondent IDs
+        const respondentIds = responses
+            .map(r => r.respondentId)
+            .filter((id): id is string => id !== null)
+
+        // Fetch user details from Clerk
+        const users = respondentIds.length > 0
+            ? await (await clerkClient()).users.getUserList({ userId: respondentIds, limit: 100 })
+            : { data: [] }
+
+        // Map users to Roblox username
+        const userMap = new Map(users.data.map(u => {
+            const roblox = u.externalAccounts.find(a =>
+                a.provider === "oauth_custom_roblox" || a.provider === "roblox"
+            )
+            return [u.id, {
+                username: roblox?.username || u.username || "Unknown",
+                robloxUsername: roblox?.username,
+                email: u.emailAddresses[0]?.emailAddress
+            }]
         }))
+
+        // Format responses
+        const formattedResponses = responses.map(r => {
+            const user = r.respondentId ? userMap.get(r.respondentId) : null
+
+            return {
+                id: r.id,
+                submittedAt: r.submittedAt,
+                respondent: form.isAnonymous ? { name: "Anonymous" } : (user ? {
+                    id: r.respondentId,
+                    email: user.email,
+                    name: user.robloxUsername || user.username
+                } : { name: "Anonymous" }),
+                answers: r.answers.reduce((acc, a) => {
+                    let value
+                    try {
+                        value = JSON.parse(a.value)
+                    } catch {
+                        value = a.value
+                    }
+                    acc[a.questionId] = {
+                        questionLabel: a.question.label,
+                        value
+                    }
+                    return acc
+                }, {} as Record<string, any>)
+            }
+        })
 
         // Export as CSV
         if (format === "csv") {
@@ -103,7 +133,7 @@ export async function GET(
             const headers = [
                 "Response ID",
                 "Submitted At",
-                ...(form.isAnonymous ? [] : ["Respondent ID", "Email"]),
+                ...(form.isAnonymous ? [] : ["Respondent ID", "Email", "Name"]),
                 ...allQuestions.map(q => q.label)
             ]
 
@@ -111,7 +141,7 @@ export async function GET(
                 const row = [
                     r.id,
                     r.submittedAt.toISOString(),
-                    ...(form.isAnonymous ? [] : [r.respondent?.id || "", r.respondent?.email || ""])
+                    ...(form.isAnonymous ? [] : [r.respondent?.id || "", r.respondent?.email || "", r.respondent?.name || ""])
                 ]
                 for (const q of allQuestions) {
                     const answer = r.answers[q.id]

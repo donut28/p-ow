@@ -4,18 +4,20 @@ import { prisma } from "@/lib/db"
 import { isServerAdmin } from "@/lib/admin"
 
 // Helper to check form access
-async function canViewAnalytics(userId: string, formId: string): Promise<boolean> {
+async function canViewAnalytics(user: { id: string, discordId?: string }, formId: string): Promise<boolean> {
     const form = await prisma.form.findUnique({
         where: { id: formId },
-        select: { serverId: true }
+        select: { serverId: true, createdBy: true }
     })
     if (!form) return false
 
-    const isAdmin = await isServerAdmin({ id: userId } as any, form.serverId)
+    if (form.createdBy === user.id) return true
+
+    const isAdmin = await isServerAdmin(user as any, form.serverId)
     if (isAdmin) return true
 
     const editorAccess = await prisma.formEditorAccess.findUnique({
-        where: { formId_userId: { formId, userId } }
+        where: { formId_userId: { formId, userId: user.id } }
     })
     return !!editorAccess
 }
@@ -33,7 +35,7 @@ export async function GET(
 
         const { formId } = await params
 
-        const canView = await canViewAnalytics(session.user.id, formId)
+        const canView = await canViewAnalytics(session.user, formId)
         if (!canView) {
             return NextResponse.json({ error: "Access denied" }, { status: 403 })
         }

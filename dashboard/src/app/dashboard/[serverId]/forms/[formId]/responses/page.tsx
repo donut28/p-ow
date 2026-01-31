@@ -7,7 +7,7 @@ import { ArrowLeft, Download, BarChart3, FileText, Users, Calendar, ChevronDown,
 interface Response {
     id: string
     submittedAt: string
-    respondent: { id: string; email: string } | null
+    respondent: { id: string; email?: string; name: string } | null
     answers: Record<string, { questionLabel: string; value: any }>
 }
 
@@ -28,6 +28,33 @@ interface Analytics {
     responseTimeline: { date: string; count: number }[]
 }
 
+const renderAnswerValue = (value: any) => {
+    if (value && typeof value === "object" && value.fileUrl && value.fileName) {
+        return (
+            <a
+                href={value.fileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-3 py-2 bg-[#222] hover:bg-[#333] rounded-lg text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <Download className="h-4 w-4" />
+                {value.fileName}
+            </a>
+        )
+    }
+
+    if (Array.isArray(value)) {
+        return value.join(", ")
+    }
+
+    if (typeof value === "object") {
+        return JSON.stringify(value)
+    }
+
+    return String(value)
+}
+
 export default function ResponsesPage({
     params,
 }: {
@@ -37,6 +64,7 @@ export default function ResponsesPage({
     const [responses, setResponses] = useState<Response[]>([])
     const [analytics, setAnalytics] = useState<Analytics | null>(null)
     const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
     const [expandedResponse, setExpandedResponse] = useState<string | null>(null)
     const [resolvedParams, setResolvedParams] = useState<{ serverId: string; formId: string } | null>(null)
 
@@ -60,7 +88,10 @@ export default function ResponsesPage({
             if (analyticsRes.ok) {
                 setAnalytics(await analyticsRes.json())
             }
-        } catch { }
+        } catch (error) {
+            console.error("Failed to load data:", error)
+            setError("Failed to load responses. You may not have permission.")
+        }
         setLoading(false)
     }
 
@@ -118,193 +149,201 @@ export default function ResponsesPage({
                 </div>
             </div>
 
-            <div className="max-w-6xl mx-auto p-6">
-                {tab === "analytics" && analytics && (
-                    <div className="space-y-6">
-                        {/* Overview Stats */}
-                        <div className="grid grid-cols-3 gap-4">
-                            <div className="bg-[#1a1a1a] border border-[#333] rounded-xl p-6">
-                                <Users className="h-8 w-8 text-indigo-400 mb-2" />
-                                <p className="text-3xl font-bold text-white">{analytics.totalResponses}</p>
-                                <p className="text-zinc-500">Total Responses</p>
-                            </div>
-                            <div className="bg-[#1a1a1a] border border-[#333] rounded-xl p-6">
-                                <Calendar className="h-8 w-8 text-emerald-400 mb-2" />
-                                <p className="text-3xl font-bold text-white">
-                                    {analytics.responseTimeline.length > 0
-                                        ? analytics.responseTimeline[analytics.responseTimeline.length - 1].count
-                                        : 0}
-                                </p>
-                                <p className="text-zinc-500">Today's Responses</p>
-                            </div>
-                            <div className="bg-[#1a1a1a] border border-[#333] rounded-xl p-6">
-                                <BarChart3 className="h-8 w-8 text-amber-400 mb-2" />
-                                <p className="text-3xl font-bold text-white">{Object.keys(analytics.questionAnalytics).length}</p>
-                                <p className="text-zinc-500">Questions</p>
-                            </div>
-                        </div>
 
-                        {/* Timeline */}
-                        {analytics.responseTimeline.length > 0 && (
-                            <div className="bg-[#1a1a1a] border border-[#333] rounded-xl p-6">
-                                <h3 className="text-lg font-semibold text-white mb-4">Response Timeline</h3>
-                                <div className="flex items-end gap-1 h-32">
-                                    {analytics.responseTimeline.slice(-30).map((d, i) => {
-                                        const max = Math.max(...analytics.responseTimeline.map(t => t.count))
-                                        const height = max > 0 ? (d.count / max) * 100 : 0
-                                        return (
-                                            <div
-                                                key={i}
-                                                className="flex-1 bg-indigo-600 rounded-t"
-                                                style={{ height: `${height}%`, minHeight: d.count > 0 ? "4px" : 0 }}
-                                                title={`${d.date}: ${d.count}`}
-                                            />
-                                        )
-                                    })}
+
+            <div className="max-w-6xl mx-auto p-6">
+                {error ? (
+                    <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6 text-center text-red-400">
+                        {error}
+                    </div>
+                ) : (
+                    <>
+                        {tab === "analytics" && analytics && (
+                            <div className="space-y-6">
+                                {/* Overview Stats */}
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="bg-[#1a1a1a] border border-[#333] rounded-xl p-6">
+                                        <Users className="h-8 w-8 text-indigo-400 mb-2" />
+                                        <p className="text-3xl font-bold text-white">{analytics.totalResponses}</p>
+                                        <p className="text-zinc-500">Total Responses</p>
+                                    </div>
+                                    <div className="bg-[#1a1a1a] border border-[#333] rounded-xl p-6">
+                                        <Calendar className="h-8 w-8 text-emerald-400 mb-2" />
+                                        <p className="text-3xl font-bold text-white">
+                                            {analytics.responseTimeline.length > 0
+                                                ? analytics.responseTimeline[analytics.responseTimeline.length - 1].count
+                                                : 0}
+                                        </p>
+                                        <p className="text-zinc-500">Today's Responses</p>
+                                    </div>
+                                    <div className="bg-[#1a1a1a] border border-[#333] rounded-xl p-6">
+                                        <BarChart3 className="h-8 w-8 text-amber-400 mb-2" />
+                                        <p className="text-3xl font-bold text-white">{Object.keys(analytics.questionAnalytics).length}</p>
+                                        <p className="text-zinc-500">Questions</p>
+                                    </div>
                                 </div>
-                                <p className="text-xs text-zinc-500 mt-2">Last 30 days</p>
+
+                                {/* Timeline */}
+                                {analytics.responseTimeline.length > 0 && (
+                                    <div className="bg-[#1a1a1a] border border-[#333] rounded-xl p-6">
+                                        <h3 className="text-lg font-semibold text-white mb-4">Response Timeline</h3>
+                                        <div className="flex items-end gap-1 h-32">
+                                            {analytics.responseTimeline.slice(-30).map((d, i) => {
+                                                const max = Math.max(...analytics.responseTimeline.map(t => t.count))
+                                                // Ensure standard height if max is low to avoid "blue rectangle" look
+                                                const normalizedMax = Math.max(max, 5)
+                                                const height = (d.count / normalizedMax) * 100
+                                                return (
+                                                    <div
+                                                        key={i}
+                                                        className="flex-1 bg-indigo-600 rounded-t"
+                                                        style={{ height: `${height}%`, minHeight: d.count > 0 ? "4px" : 0 }}
+                                                        title={`${d.date}: ${d.count}`}
+                                                    />
+                                                )
+                                            })}
+                                        </div>
+                                        <p className="text-xs text-zinc-500 mt-2">Last 30 days</p>
+                                    </div>
+                                )}
+
+                                {/* Question Analytics */}
+                                <div className="space-y-4">
+                                    {Object.entries(analytics.questionAnalytics).map(([qId, qa]) => (
+                                        <div key={qId} className="bg-[#1a1a1a] border border-[#333] rounded-xl p-6">
+                                            <div className="flex items-start justify-between mb-4">
+                                                <div>
+                                                    <h3 className="font-medium text-white">{qa.questionLabel}</h3>
+                                                    <p className="text-sm text-zinc-500">{qa.total} responses</p>
+                                                </div>
+                                                <span className="text-xs bg-zinc-800 px-2 py-1 rounded text-zinc-400">{qa.questionType}</span>
+                                            </div>
+
+                                            {qa.type === "distribution" && qa.data && (
+                                                <div className="space-y-2">
+                                                    {qa.data.map((d, i) => {
+                                                        const percentage = qa.total > 0 ? (d.value / qa.total) * 100 : 0
+                                                        return (
+                                                            <div key={i}>
+                                                                <div className="flex justify-between text-sm mb-1">
+                                                                    <span className="text-zinc-300">{d.label}</span>
+                                                                    <span className="text-zinc-500">{d.value} ({percentage.toFixed(1)}%)</span>
+                                                                </div>
+                                                                <div className="h-2 bg-[#333] rounded-full overflow-hidden">
+                                                                    <div
+                                                                        className="h-full bg-indigo-600 rounded-full"
+                                                                        style={{ width: `${percentage}%` }}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                            )}
+
+                                            {qa.type === "scale" && qa.data && (
+                                                <div className="space-y-3">
+                                                    <p className="text-2xl font-bold text-white">Average: {qa.average}</p>
+                                                    <div className="flex items-end gap-1 h-20">
+                                                        {qa.data.map((d, i) => {
+                                                            const max = Math.max(...qa.data!.map(x => x.value))
+                                                            const height = max > 0 ? (d.value / max) * 100 : 0
+                                                            return (
+                                                                <div key={i} className="flex-1 flex flex-col items-center">
+                                                                    <div
+                                                                        className="w-full bg-indigo-600 rounded-t"
+                                                                        style={{ height: `${height}%`, minHeight: d.value > 0 ? "4px" : 0 }}
+                                                                    />
+                                                                    <span className="text-xs text-zinc-500 mt-1">{d.label}</span>
+                                                                </div>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {qa.type === "text" && qa.samples && (
+                                                <div className="space-y-2">
+                                                    <p className="text-sm text-zinc-500">Recent responses:</p>
+                                                    {qa.samples.slice(0, 3).map((s, i) => (
+                                                        <div key={i} className="bg-[#222] p-3 rounded text-sm text-zinc-300">
+                                                            "{s}"
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {qa.type === "date" && qa.data && qa.data.length > 0 && (
+                                                <div className="flex items-end gap-1 h-20">
+                                                    {qa.data.map((d, i) => {
+                                                        const max = Math.max(...qa.data!.map(x => x.value))
+                                                        const height = max > 0 ? (d.value / max) * 100 : 0
+                                                        return (
+                                                            <div key={i} className="flex-1 flex flex-col items-center">
+                                                                <div
+                                                                    className="w-full bg-emerald-600 rounded-t"
+                                                                    style={{ height: `${height}%`, minHeight: d.value > 0 ? "4px" : 0 }}
+                                                                />
+                                                                <span className="text-xs text-zinc-500 mt-1">{d.label}</span>
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         )}
 
-                        {/* Question Analytics */}
-                        <div className="space-y-4">
-                            {Object.entries(analytics.questionAnalytics).map(([qId, qa]) => (
-                                <div key={qId} className="bg-[#1a1a1a] border border-[#333] rounded-xl p-6">
-                                    <div className="flex items-start justify-between mb-4">
-                                        <div>
-                                            <h3 className="font-medium text-white">{qa.questionLabel}</h3>
-                                            <p className="text-sm text-zinc-500">{qa.total} responses</p>
-                                        </div>
-                                        <span className="text-xs bg-zinc-800 px-2 py-1 rounded text-zinc-400">{qa.questionType}</span>
+                        {tab === "responses" && (
+                            <div className="space-y-4">
+                                {responses.length === 0 ? (
+                                    <div className="bg-[#1a1a1a] border border-[#333] rounded-xl p-12 text-center">
+                                        <FileText className="h-12 w-12 text-zinc-600 mx-auto mb-4" />
+                                        <p className="text-zinc-400">No responses yet</p>
                                     </div>
-
-                                    {qa.type === "distribution" && qa.data && (
-                                        <div className="space-y-2">
-                                            {qa.data.map((d, i) => {
-                                                const percentage = qa.total > 0 ? (d.value / qa.total) * 100 : 0
-                                                return (
-                                                    <div key={i}>
-                                                        <div className="flex justify-between text-sm mb-1">
-                                                            <span className="text-zinc-300">{d.label}</span>
-                                                            <span className="text-zinc-500">{d.value} ({percentage.toFixed(1)}%)</span>
-                                                        </div>
-                                                        <div className="h-2 bg-[#333] rounded-full overflow-hidden">
-                                                            <div
-                                                                className="h-full bg-indigo-600 rounded-full"
-                                                                style={{ width: `${percentage}%` }}
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                )
-                                            })}
-                                        </div>
-                                    )}
-
-                                    {qa.type === "scale" && qa.data && (
-                                        <div className="space-y-3">
-                                            <p className="text-2xl font-bold text-white">Average: {qa.average}</p>
-                                            <div className="flex items-end gap-1 h-20">
-                                                {qa.data.map((d, i) => {
-                                                    const max = Math.max(...qa.data!.map(x => x.value))
-                                                    const height = max > 0 ? (d.value / max) * 100 : 0
-                                                    return (
-                                                        <div key={i} className="flex-1 flex flex-col items-center">
-                                                            <div
-                                                                className="w-full bg-indigo-600 rounded-t"
-                                                                style={{ height: `${height}%`, minHeight: d.value > 0 ? "4px" : 0 }}
-                                                            />
-                                                            <span className="text-xs text-zinc-500 mt-1">{d.label}</span>
-                                                        </div>
-                                                    )
-                                                })}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {qa.type === "text" && qa.samples && (
-                                        <div className="space-y-2">
-                                            <p className="text-sm text-zinc-500">Recent responses:</p>
-                                            {qa.samples.slice(0, 3).map((s, i) => (
-                                                <div key={i} className="bg-[#222] p-3 rounded text-sm text-zinc-300">
-                                                    "{s}"
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    {qa.type === "date" && qa.data && qa.data.length > 0 && (
-                                        <div className="flex items-end gap-1 h-20">
-                                            {qa.data.map((d, i) => {
-                                                const max = Math.max(...qa.data!.map(x => x.value))
-                                                const height = max > 0 ? (d.value / max) * 100 : 0
-                                                return (
-                                                    <div key={i} className="flex-1 flex flex-col items-center">
-                                                        <div
-                                                            className="w-full bg-emerald-600 rounded-t"
-                                                            style={{ height: `${height}%`, minHeight: d.value > 0 ? "4px" : 0 }}
-                                                        />
-                                                        <span className="text-xs text-zinc-500 mt-1">{d.label}</span>
-                                                    </div>
-                                                )
-                                            })}
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {tab === "responses" && (
-                    <div className="space-y-4">
-                        {responses.length === 0 ? (
-                            <div className="bg-[#1a1a1a] border border-[#333] rounded-xl p-12 text-center">
-                                <FileText className="h-12 w-12 text-zinc-600 mx-auto mb-4" />
-                                <p className="text-zinc-400">No responses yet</p>
-                            </div>
-                        ) : (
-                            responses.map((r) => (
-                                <div key={r.id} className="bg-[#1a1a1a] border border-[#333] rounded-xl overflow-hidden">
-                                    <button
-                                        onClick={() => setExpandedResponse(expandedResponse === r.id ? null : r.id)}
-                                        className="w-full flex items-center justify-between p-4 text-left"
-                                    >
-                                        <div>
-                                            <p className="text-white font-medium">
-                                                {r.respondent ? (r.respondent.email || `User ${r.respondent.id.slice(0, 8)}`) : "Anonymous"}
-                                            </p>
-                                            <p className="text-sm text-zinc-500">
-                                                {new Date(r.submittedAt).toLocaleString()}
-                                            </p>
-                                        </div>
-                                        {expandedResponse === r.id ? (
-                                            <ChevronUp className="h-5 w-5 text-zinc-500" />
-                                        ) : (
-                                            <ChevronDown className="h-5 w-5 text-zinc-500" />
-                                        )}
-                                    </button>
-                                    {expandedResponse === r.id && (
-                                        <div className="border-t border-[#333] p-4 space-y-3">
-                                            {Object.entries(r.answers).map(([qId, answer]) => (
-                                                <div key={qId}>
-                                                    <p className="text-sm text-zinc-500">{answer.questionLabel}</p>
-                                                    <p className="text-white">
-                                                        {Array.isArray(answer.value)
-                                                            ? answer.value.join(", ")
-                                                            : typeof answer.value === "object"
-                                                                ? JSON.stringify(answer.value)
-                                                                : String(answer.value)}
+                                ) : (
+                                    responses.map((r) => (
+                                        <div key={r.id} className="bg-[#1a1a1a] border border-[#333] rounded-xl overflow-hidden">
+                                            <button
+                                                onClick={() => setExpandedResponse(expandedResponse === r.id ? null : r.id)}
+                                                className="w-full flex items-center justify-between p-4 text-left"
+                                            >
+                                                <div>
+                                                    <p className="text-white font-medium">
+                                                        {r.respondent ? r.respondent.name : "Anonymous"}
+                                                    </p>
+                                                    <p className="text-sm text-zinc-500">
+                                                        {new Date(r.submittedAt).toLocaleString()}
                                                     </p>
                                                 </div>
-                                            ))}
+                                                {expandedResponse === r.id ? (
+                                                    <ChevronUp className="h-5 w-5 text-zinc-500" />
+                                                ) : (
+                                                    <ChevronDown className="h-5 w-5 text-zinc-500" />
+                                                )}
+                                            </button>
+                                            {expandedResponse === r.id && (
+                                                <div className="border-t border-[#333] p-4 space-y-3">
+                                                    {Object.entries(r.answers).map(([qId, answer]) => (
+                                                        <div key={qId}>
+                                                            <p className="text-sm text-zinc-500">{answer.questionLabel}</p>
+                                                            <div className="text-white">
+                                                                {renderAnswerValue(answer.value)}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
-                                </div>
-                            ))
+                                    ))
+                                )}
+                            </div>
                         )}
-                    </div>
+                    </>
                 )}
             </div>
-        </div>
+        </div >
     )
 }
