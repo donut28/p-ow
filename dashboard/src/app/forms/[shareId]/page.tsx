@@ -371,24 +371,47 @@ function QuestionInput({
 }) {
     const [uploading, setUploading] = useState(false)
 
-    const handleFileUpload = async (file: File) => {
+    // Normalize value to array format
+    const files = Array.isArray(value) ? value : (value?.url ? [value] : [])
+
+    const handleFileUpload = async (fileList: FileList) => {
+        const filesToUpload = Array.from(fileList)
+        const totalFiles = files.length + filesToUpload.length
+
+        if (totalFiles > 20) {
+            alert(`You can only upload up to 20 files. Currently have ${files.length}, trying to add ${filesToUpload.length}.`)
+            return
+        }
+
         setUploading(true)
-        try {
-            const formData = new FormData()
-            formData.append("file", file)
-            formData.append("formId", formId)
+        const uploaded: { url: string; filename: string }[] = []
 
-            const res = await fetch("/api/forms/upload", {
-                method: "POST",
-                body: formData
-            })
+        for (const file of filesToUpload) {
+            try {
+                const formData = new FormData()
+                formData.append("file", file)
+                formData.append("formId", formId)
 
-            if (res.ok) {
-                const data = await res.json()
-                onChange({ url: data.url, filename: data.filename })
-            }
-        } catch { }
+                const res = await fetch("/api/forms/upload", {
+                    method: "POST",
+                    body: formData
+                })
+
+                if (res.ok) {
+                    const data = await res.json()
+                    uploaded.push({ url: data.url, filename: data.filename })
+                }
+            } catch { }
+        }
+
+        // Append new files to existing ones
+        onChange([...files, ...uploaded])
         setUploading(false)
+    }
+
+    const removeFile = (index: number) => {
+        const newFiles = files.filter((_, i) => i !== index)
+        onChange(newFiles.length > 0 ? newFiles : null)
     }
 
     return (
@@ -517,32 +540,43 @@ function QuestionInput({
 
             {question.type === "file_upload" && (
                 <div className={`border-2 border-dashed ${error ? "border-red-500" : "border-[#333]"} rounded-lg p-6`}>
-                    {value?.url ? (
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <FileText className="h-8 w-8 text-indigo-400" />
-                                <span className="text-white">{value.filename}</span>
-                            </div>
-                            <button onClick={() => onChange(null)} className="text-zinc-500 hover:text-red-400">
-                                <X className="h-5 w-5" />
-                            </button>
+                    {/* List of uploaded files */}
+                    {files.length > 0 && (
+                        <div className="space-y-2 mb-4">
+                            {files.map((file, index) => (
+                                <div key={index} className="flex items-center justify-between bg-[#222] rounded-lg px-3 py-2">
+                                    <div className="flex items-center gap-3">
+                                        <FileText className="h-5 w-5 text-indigo-400" />
+                                        <span className="text-white text-sm truncate max-w-[200px]">{file.filename}</span>
+                                    </div>
+                                    <button onClick={() => removeFile(index)} className="text-zinc-500 hover:text-red-400">
+                                        <X className="h-4 w-4" />
+                                    </button>
+                                </div>
+                            ))}
                         </div>
-                    ) : uploading ? (
+                    )}
+
+                    {/* Upload more or uploading indicator */}
+                    {uploading ? (
                         <div className="flex items-center justify-center gap-2 text-zinc-400">
                             <Loader2 className="h-5 w-5 animate-spin" />
                             Uploading...
                         </div>
-                    ) : (
+                    ) : files.length < 20 ? (
                         <label className="flex flex-col items-center cursor-pointer">
                             <Upload className="h-8 w-8 text-zinc-500 mb-2" />
-                            <span className="text-zinc-400">Click to upload</span>
-                            <span className="text-xs text-zinc-600 mt-1">Max 10MB</span>
+                            <span className="text-zinc-400">{files.length > 0 ? "Add more files" : "Click to upload"}</span>
+                            <span className="text-xs text-zinc-600 mt-1">Max 1GB per file · Up to 20 files</span>
                             <input
                                 type="file"
+                                multiple
                                 className="hidden"
-                                onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
+                                onChange={(e) => e.target.files && e.target.files.length > 0 && handleFileUpload(e.target.files)}
                             />
                         </label>
+                    ) : (
+                        <p className="text-center text-zinc-500 text-sm">Maximum 20 files reached</p>
                     )}
                 </div>
             )}

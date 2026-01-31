@@ -29,18 +29,42 @@ interface Analytics {
 }
 
 const renderAnswerValue = (value: any) => {
-    if (value && typeof value === "object" && value.fileUrl && value.fileName) {
+    // Handle file upload objects (stored as {url, filename})
+    if (value && typeof value === "object" && value.url && value.filename) {
         return (
             <a
-                href={value.fileUrl}
+                href={value.url}
                 target="_blank"
                 rel="noopener noreferrer"
+                download={value.filename}
                 className="inline-flex items-center gap-2 px-3 py-2 bg-[#222] hover:bg-[#333] rounded-lg text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
                 onClick={(e) => e.stopPropagation()}
             >
                 <Download className="h-4 w-4" />
-                {value.fileName}
+                {value.filename}
             </a>
+        )
+    }
+
+    // Handle array of file uploads
+    if (Array.isArray(value) && value.length > 0 && value[0]?.url) {
+        return (
+            <div className="flex flex-wrap gap-2">
+                {value.map((file, i) => (
+                    <a
+                        key={i}
+                        href={file.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        download={file.filename}
+                        className="inline-flex items-center gap-2 px-3 py-2 bg-[#222] hover:bg-[#333] rounded-lg text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <Download className="h-4 w-4" />
+                        {file.filename}
+                    </a>
+                ))}
+            </div>
         )
     }
 

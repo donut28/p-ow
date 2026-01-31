@@ -22,10 +22,10 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "formId is required" }, { status: 400 })
         }
 
-        // Validate file size (max 10MB)
-        const maxSize = 10 * 1024 * 1024
+        // Validate file size (max 1GB)
+        const maxSize = 1024 * 1024 * 1024
         if (file.size > maxSize) {
-            return NextResponse.json({ error: "File too large (max 10MB)" }, { status: 400 })
+            return NextResponse.json({ error: "File too large (max 1GB)" }, { status: 400 })
         }
 
         // Generate unique filename
