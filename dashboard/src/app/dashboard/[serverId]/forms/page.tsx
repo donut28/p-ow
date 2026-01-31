@@ -43,8 +43,14 @@ export default async function FormsPage({
     })
 
     return (
-        <div className="min-h-screen bg-[#111] p-6">
-            <div className="max-w-6xl mx-auto space-y-6">
+        <div className="min-h-screen bg-[#111] p-6 flex flex-col">
+            {/* Branding Header */}
+            <div className="max-w-6xl mx-auto w-full mb-6 flex items-center gap-2">
+                <img src="/logo.png" alt="POW" className="h-8 w-8 opacity-70" />
+                <span className="text-white/70 text-sm font-medium">Project Overwatch</span>
+            </div>
+
+            <div className="max-w-6xl mx-auto space-y-6 flex-1">
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div>
@@ -105,10 +111,10 @@ export default async function FormsPage({
                                         {/* Status Badge */}
                                         <div className="absolute top-3 right-3">
                                             <span className={`px-2 py-1 rounded text-xs font-medium ${form.status === "published"
-                                                    ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                                                    : form.status === "closed"
-                                                        ? "bg-red-500/20 text-red-400 border border-red-500/30"
-                                                        : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                                                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                                : form.status === "closed"
+                                                    ? "bg-red-500/20 text-red-400 border border-red-500/30"
+                                                    : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
                                                 }`}>
                                                 {form.status === "published" ? (
                                                     <><Eye className="h-3 w-3 inline mr-1" /> Published</>
@@ -198,6 +204,11 @@ export default async function FormsPage({
                     </Link>
                 </div>
             </div>
+
+            {/* Footer */}
+            <footer className="max-w-6xl mx-auto w-full mt-8 pt-4 border-t border-[#222] text-center">
+                <p className="text-xs text-zinc-600">© 2026 Project Overwatch - erlc moderation but better™</p>
+            </footer>
         </div>
     )
 }

@@ -95,6 +95,11 @@ export default async function AdminLayout({
             <div className="max-w-7xl mx-auto px-6 py-8">
                 {children}
             </div>
+
+            {/* Footer */}
+            <footer className="py-4 text-center border-t border-[#222]">
+                <p className="text-xs text-zinc-600">© 2026 Project Overwatch - erlc moderation but better™</p>
+            </footer>
         </div>
     )
 }

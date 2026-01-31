@@ -62,6 +62,11 @@ export default async function ServerDashboardLayout({
                     <main className="flex-1 overflow-y-auto p-6 pb-24 md:pb-6 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
                         {children}
                     </main>
+
+                    {/* Footer */}
+                    <footer className="hidden md:block py-3 px-6 border-t border-white/5 text-center">
+                        <p className="text-xs text-zinc-600">© 2026 Project Overwatch - erlc moderation but better™</p>
+                    </footer>
                 </div>
 
                 {/* Mobile bottom navigation */}

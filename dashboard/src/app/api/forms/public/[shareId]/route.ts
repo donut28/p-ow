@@ -45,11 +45,95 @@ export async function GET(
             return NextResponse.json({ error: "Form has reached maximum responses" }, { status: 403 })
         }
 
-        // Check if user has already submitted (if not allowing multiple) or has a draft
+        // Check role-based access
+        const session = await getSession()
+
+        // Parse role arrays
+        const requiredRoles: string[] = form.requiredRoleIds ? JSON.parse(form.requiredRoleIds) : []
+        const ignoredRoles: string[] = form.ignoredRoleIds ? JSON.parse(form.ignoredRoleIds) : []
+
+        // If no role gating configured (both arrays empty), skip role checks
+        const hasRoleGating = requiredRoles.length > 0 || ignoredRoles.length > 0
+
+        if (hasRoleGating) {
+            // Role gating requires login
+            if (!session) {
+                return NextResponse.json({
+                    error: "Login required to access this form",
+                    requiresAuth: true
+                }, { status: 401 })
+            }
+
+            // Get user's Discord ID
+            const discordId = session.user.discordId
+            if (!discordId) {
+                return NextResponse.json({
+                    error: "You must link your Discord account to access this form"
+                }, { status: 403 })
+            }
+
+            // Get the server's Discord Guild ID
+            const server = await prisma.server.findUnique({
+                where: { id: form.serverId },
+                select: { discordGuildId: true }
+            })
+
+            const guildId = server?.discordGuildId || process.env.GUILD_ID
+            if (!guildId) {
+                return NextResponse.json({
+                    error: "Discord Guild not configured for this server"
+                }, { status: 500 })
+            }
+
+            // Fetch user's actual Discord roles via Discord API
+            const botToken = process.env.DISCORD_BOT_TOKEN
+            if (!botToken) {
+                return NextResponse.json({
+                    error: "Discord bot not configured"
+                }, { status: 500 })
+            }
+
+            const memberRes = await fetch(
+                `https://discord.com/api/v10/guilds/${guildId}/members/${discordId}`,
+                { headers: { Authorization: `Bot ${botToken}` } }
+            )
+
+            if (!memberRes.ok) {
+                if (memberRes.status === 404) {
+                    return NextResponse.json({
+                        error: "You must be in the Discord server to access this form"
+                    }, { status: 403 })
+                }
+                return NextResponse.json({
+                    error: "Failed to verify Discord roles"
+                }, { status: 500 })
+            }
+
+            const memberData = await memberRes.json()
+            const userDiscordRoles: string[] = memberData.roles || []
+
+            // Check ignored roles (block if user has ANY of them)
+            const hasIgnoredRole = ignoredRoles.some(roleId => userDiscordRoles.includes(roleId))
+            if (hasIgnoredRole) {
+                return NextResponse.json({
+                    error: "You do not have permission to access this form"
+                }, { status: 403 })
+            }
+
+            // Check required roles (must have at least ONE)
+            if (requiredRoles.length > 0) {
+                const hasRequiredRole = requiredRoles.some(roleId => userDiscordRoles.includes(roleId))
+                if (!hasRequiredRole) {
+                    return NextResponse.json({
+                        error: "You do not have the required role to access this form"
+                    }, { status: 403 })
+                }
+            }
+        }
+
         let hasSubmitted = false
         let draftAnswers: Record<string, any> | null = null
 
-        const session = await getSession()
         if (session) {
             // Check for completed submissions
             if (!form.allowMultiple) {

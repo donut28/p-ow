@@ -62,6 +62,54 @@ export async function POST(
             }
         }
 
+        // Check role-based access
+        const requiredRoles: string[] = form.requiredRoleIds ? JSON.parse(form.requiredRoleIds) : []
+        const ignoredRoles: string[] = form.ignoredRoleIds ? JSON.parse(form.ignoredRoleIds) : []
+        const hasRoleGating = requiredRoles.length > 0 || ignoredRoles.length > 0
+
+        if (hasRoleGating) {
+            if (!session) {
+                return NextResponse.json({ error: "Login required to submit this form" }, { status: 401 })
+            }
+
+            const discordId = session.user.discordId
+            if (!discordId) {
+                return NextResponse.json({ error: "You must link your Discord account" }, { status: 403 })
+            }
+
+            const server = await prisma.server.findUnique({
+                where: { id: form.serverId },
+                select: { discordGuildId: true }
+            })
+
+            const guildId = server?.discordGuildId || process.env.GUILD_ID
+            const botToken = process.env.DISCORD_BOT_TOKEN
+
+            if (!guildId || !botToken) {
+                return NextResponse.json({ error: "Discord not configured" }, { status: 500 })
+            }
+
+            const memberRes = await fetch(
+                `https://discord.com/api/v10/guilds/${guildId}/members/${discordId}`,
+                { headers: { Authorization: `Bot ${botToken}` } }
+            )
+
+            if (!memberRes.ok) {
+                return NextResponse.json({ error: "You must be in the Discord server" }, { status: 403 })
+            }
+
+            const memberData = await memberRes.json()
+            const userDiscordRoles: string[] = memberData.roles || []
+
+            if (ignoredRoles.some(r => userDiscordRoles.includes(r))) {
+                return NextResponse.json({ error: "You do not have permission to submit this form" }, { status: 403 })
+            }
+
+            if (requiredRoles.length > 0 && !requiredRoles.some(r => userDiscordRoles.includes(r))) {
+                return NextResponse.json({ error: "You do not have the required role" }, { status: 403 })
+            }
+        }
+
         const body = await request.json()
         const { answers, email, saveAsDraft } = body
 

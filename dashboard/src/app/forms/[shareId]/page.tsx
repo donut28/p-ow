@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use, useRef } from "react"
 import { useRouter } from "next/navigation"
+import { useUser, SignInButton, UserButton } from "@clerk/nextjs"
 import { FileText, Upload, X, Check, AlertCircle, ChevronDown, Loader2 } from "lucide-react"
 
 interface Question {
@@ -42,6 +43,7 @@ export default function PublicFormPage({
 }) {
     const { shareId } = use(params)
     const router = useRouter()
+    const { isSignedIn, isLoaded } = useUser()
     const [form, setForm] = useState<Form | null>(null)
     const [answers, setAnswers] = useState<Record<string, any>>({})
     const [loading, setLoading] = useState(true)
@@ -217,8 +219,51 @@ export default function PublicFormPage({
 
     if (!form) return null
 
+    // Block form access if login required but not signed in
+    if (form.requiresAuth && !isSignedIn && isLoaded) {
+        return (
+            <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-6">
+                <div className="bg-[#1a1a1a] border border-[#333] rounded-xl p-8 max-w-md text-center">
+                    <img src="/logo.png" alt="POW" className="h-16 w-16 mx-auto mb-4 opacity-80" />
+                    <h2 className="text-xl font-bold text-white mb-2">Login Required</h2>
+                    <p className="text-zinc-400 mb-6">You must be signed in to access this form.</p>
+                    <SignInButton mode="modal">
+                        <button className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg transition-colors">
+                            Sign In to Continue
+                        </button>
+                    </SignInButton>
+                </div>
+            </div>
+        )
+    }
+
     return (
         <div className="min-h-screen bg-[#0a0a0a] py-8 px-4">
+            {/* Auth Header */}
+            <div className="max-w-2xl mx-auto mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <img src="/logo.png" alt="POW" className="h-8 w-8 opacity-70" />
+                    <span className="text-white/70 text-sm font-medium">Project Overwatch</span>
+                </div>
+                {isLoaded && (
+                    isSignedIn ? (
+                        <UserButton
+                            afterSignOutUrl={`/forms/${shareId}`}
+                            appearance={{
+                                elements: {
+                                    avatarBox: "h-10 w-10"
+                                }
+                            }}
+                        />
+                    ) : (
+                        <SignInButton mode="modal">
+                            <button className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors">
+                                Sign In
+                            </button>
+                        </SignInButton>
+                    )
+                )}
+            </div>
             <div className="max-w-2xl mx-auto space-y-6">
                 {/* Header */}
                 <div className="bg-[#1a1a1a] border border-[#333] rounded-xl overflow-hidden">
@@ -304,7 +349,7 @@ export default function PublicFormPage({
 
                 {/* Footer */}
                 <p className="text-center text-xs text-zinc-600">
-                    Powered by Project Overwatch
+                    © 2026 Project Overwatch - erlc moderation but better™
                 </p>
             </div>
         </div>
