@@ -59,7 +59,7 @@ export async function GET(
         }
 
         // Get all answers grouped by question
-        const allQuestions = form.sections.flatMap(s => s.questions)
+        const allQuestions = form.sections.flatMap((s: any) => s.questions)
 
         const analytics: Record<string, any> = {}
 
@@ -132,7 +132,7 @@ export async function GET(
                 case "scale": {
                     // Calculate average and distribution
                     const values = answers.map(a => parseInt(a.value)).filter(v => !isNaN(v))
-                    const avg = values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0
+                    const avg = values.length > 0 ? values.reduce((a: number, b: number) => a + b, 0) / values.length : 0
 
                     const distribution: Record<number, number> = {}
                     const min = config.min || 1
@@ -163,7 +163,7 @@ export async function GET(
                         type: "text",
                         total: answers.length,
                         // Include sample of recent responses
-                        samples: answers.slice(0, 5).map(a => a.value)
+                        samples: answers.slice(0, 5).map((a: any) => a.value)
                     }
                     break
                 }

@@ -159,7 +159,7 @@ export async function GET(
 
             if (draft) {
                 draftAnswers = {}
-                draft.answers.forEach(a => {
+                draft.answers.forEach((a: any) => {
                     try {
                         // Parse JSON value
                         const val = JSON.parse(a.value)
@@ -176,9 +176,9 @@ export async function GET(
             ...form,
             status: undefined, // Don't expose internal status
             editorShareId: undefined, // Don't expose editor link
-            sections: form.sections.map(s => ({
+            sections: form.sections.map((s: any) => ({
                 ...s,
-                questions: s.questions.map(q => ({
+                questions: s.questions.map((q: any) => ({
                     ...q,
                     config: JSON.parse(q.config || "{}"),
                     conditions: JSON.parse(q.conditions || "{}")

@@ -2,8 +2,7 @@
 "use client"
 
 import React, { useState } from "react"
-import { Bot, Command, Zap, Calendar, X, Send, Loader2, Check, Terminal, ClipboardList, Bell } from "lucide-react"
-import { GarminPanel } from "./garmin-panel"
+import { Command, Zap, Calendar, X, Send, Loader2, Check, Terminal, ClipboardList, Bell } from "lucide-react"
 import { usePermissions } from "@/components/auth/role-sync-wrapper"
 
 interface ToolboxProps {
@@ -12,7 +11,6 @@ interface ToolboxProps {
 }
 
 export function Toolbox({ serverId, isOnLoa }: ToolboxProps) {
-    const [garminOpen, setGarminOpen] = useState(false)
     const [loaOpen, setLoaOpen] = useState(false)
     const [commandOpen, setCommandOpen] = useState(false)
     const [permLogOpen, setPermLogOpen] = useState(false)
@@ -186,20 +184,6 @@ export function Toolbox({ serverId, isOnLoa }: ToolboxProps) {
 
                 <div className="h-4 w-px bg-[#333]" />
 
-                {/* Garmin Button */}
-                {permissions.canUseToolbox && (
-                    <button
-                        onClick={() => setGarminOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 hover:border-indigo-500/40 text-indigo-400 hover:text-indigo-300 transition-all group flex-shrink-0"
-                    >
-                        <div className="h-6 w-6 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center group-hover:shadow-lg group-hover:shadow-indigo-500/30 transition-shadow">
-                            <Bot className="h-3 w-3 text-white" />
-                        </div>
-                        <span className="text-sm font-medium">Garmin</span>
-                        <Zap className="h-3 w-3 opacity-50" />
-                    </button>
-                )}
-
                 {/* Perm Log Button */}
                 {permissions.canUseToolbox && (
                     <button
@@ -251,19 +235,6 @@ export function Toolbox({ serverId, isOnLoa }: ToolboxProps) {
                     </button>
                 )}
             </div>
-
-            {/* Garmin Panel Modal */}
-            {garminOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="w-full max-w-2xl h-[80vh] bg-[#111] rounded-2xl overflow-hidden shadow-2xl shadow-indigo-500/10 border border-[#333]">
-                        <GarminPanel
-                            serverId={serverId}
-                            isOpen={true}
-                            onClose={() => setGarminOpen(false)}
-                        />
-                    </div>
-                </div>
-            )}
 
             {/* Perm Log Modal */}
             {permLogOpen && (

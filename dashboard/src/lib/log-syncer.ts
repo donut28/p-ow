@@ -528,16 +528,23 @@ export async function fetchAndSaveLogs(apiKey: string, serverId: string) {
             try {
                 const server = await prisma.server.findUnique({
                     where: { id: serverId },
-                    select: { raidAlertChannelId: true, staffRoleId: true, id: true, name: true }
+                    select: { raidAlertChannelId: true, staffRoleId: true, id: true, name: true, subscriptionPlan: true }
                 })
 
-                if (server?.raidAlertChannelId) {
+                // Check if server has raid detection feature (Pro or Max only)
+                const { getServerPlan } = await import("@/lib/subscription")
+                const { isFeatureEnabled } = await import("@/lib/feature-flags")
+
+                const flagEnabled = await isFeatureEnabled('RAID_DETECTION')
+                const { hasRaidDetection } = await getServerPlan(serverId)
+
+                if (flagEnabled && hasRaidDetection && server?.raidAlertChannelId) {
                     // Filter logs to only include those from users NOT registered in Clerk
                     // and not "Remote Server"
                     const logsWithMemberInfo = await Promise.all(newCommandLogsForDetection.map(async (log: any) => {
                         const playerName = log.playerName || "Unknown"
                         const playerId = log.playerId || "0"
-                        
+
                         if (playerName === "Remote Server" || playerId === "0") return { log, isAuthorized: true }
 
                         const { member } = await findMemberByRobloxId(serverId, playerId)
@@ -554,13 +561,13 @@ export async function fetchAndSaveLogs(apiKey: string, serverId: string) {
 
                         if (detections.length > 0) {
                             console.log(`[RAID DETECTOR] Found ${detections.length} potential threats from non-registered users`)
-                            
+
                             const staffPing = server.staffRoleId ? `<@&${server.staffRoleId}>` : "@staff"
-                            
+
                             // Create rich embed payload
                             const embed = {
                                 title: "⚠️ RAID DETECTION ALERT",
-                                description: `Suspicious activity detected on **${server.name}**\n${staffPing} Please investigate immediately.`, 
+                                description: `Suspicious activity detected on **${server.name}**\n${staffPing} Please investigate immediately.`,
                                 color: 0xFF0000, // Red
                                 fields: detections.map((d: any) => ({
                                     name: `${d.type}`,

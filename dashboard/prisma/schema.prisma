@@ -13,9 +13,7 @@ model Server {
   apiUrl      String   @map("api_key") // Storing PRC Server Key here
   bannerUrl   String?  // Custom banner image URL
   customName  String?  // Display name override
-  onDutyRoleId String? // Discord Role ID to give when on duty
   discordGuildId String? // Discord Guild ID for this server
-  autoSyncRoles Boolean @default(false) // Auto-sync roles every 10s
   suspendedRoleId  String? // Discord Role ID - blocks mod panel access
   terminatedRoleId String? // Discord Role ID - triggers account deletion
   staffRoleId      String? // General staff Discord role (viewer access)
@@ -24,6 +22,14 @@ model Server {
   raidAlertChannelId    String? // Discord Channel ID for Raid Alerts
   commandLogChannelId   String? // Discord Channel ID for Command Logs
   createdAt   DateTime @default(now())
+  
+  // POW Subscription
+  subscriberUserId  String?   // Clerk user ID of subscriber
+  subscriptionPlan  String?   // 'pow-pro' | 'pow-max' | null (free)
+  
+  // White-label Bot (Max only)
+  customBotToken    String?   // Encrypted Discord bot token
+  customBotEnabled  Boolean   @default(false)
   
   logs            Log[]
   punishments     Punishment[]
@@ -240,26 +246,7 @@ model SecurityLog {
   @@index([createdAt])
 }
 
-// Command queue for cross-server synchronization (e.g., bans)
-// Commands are queued when target server is empty, then executed when populated
-model CommandQueue {
-  id          String   @id @default(cuid())
-  serverId    String   // Target server to execute command on
-  command     String   // The PRC command to execute (e.g., ":ban username reason")
-  priority    Int      @default(0) // Higher = processed first
-  status      String   @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
-  error       String?
-  
-  // Source info for tracking
-  sourceServerId String?  // Server where the original action was taken
-  relatedUserId  String?  // Roblox user ID this command affects
-  
-  createdAt   DateTime @default(now())
-  processedAt DateTime?
-
-  @@index([serverId, status])
-  @@index([status, createdAt])
-}
+// CommandQueue model removed - sync feature deprecated
 
 // FORMS FEATURE
 model Form {

@@ -79,7 +79,7 @@ export default async function ServerSelectorPage() {
                             <p className="text-zinc-500">Here are the servers and departments that you are a member of.</p>
 
                             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                                {serversWithStats.map((server) => (
+                                {serversWithStats.map((server: any) => (
                                     <div key={server.id} className="group relative overflow-hidden rounded-2xl bg-[#1a1a1a] shadow-lg transition-all hover:bg-[#1f1f1f]">
                                         {/* Banner Image with Gradient */}
                                         <div className="h-32 w-full relative group bg-zinc-800">

@@ -94,12 +94,10 @@ export async function submitPunishment(prevState: any, formData: FormData) {
                 // Execute all commands in parallel
                 await Promise.allSettled(promises)
 
-                // 3. Cross-server ban sync (for bans only)
-                if (type === "Ban" || type === "Ban Bolo") {
-                    const { syncBanToAllServers } = await import("@/lib/cross-server-sync")
-                    // Don't await - let it run in background
-                    syncBanToAllServers(serverId, username, userId, reason).catch(() => { })
-                }
+                // 3. Cross-server ban sync (for bans only) - Removed
+                // if (type === "Ban" || type === "Ban Bolo") {
+                //     // Sync removed
+                // }
             }
         } catch (prcError) {
             // PRC error - still continue, punishment is logged

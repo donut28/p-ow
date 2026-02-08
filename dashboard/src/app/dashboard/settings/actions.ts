@@ -4,12 +4,19 @@ import { getSession } from "@/lib/auth-clerk"
 import { prisma } from "@/lib/db"
 import { PrcClient } from "@/lib/prc"
 import { isSuperAdmin } from "@/lib/admin"
+import { isFeatureEnabled } from "@/lib/feature-flags"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 
 export async function addServer(prevState: any, formData: FormData) {
     const session = await getSession()
     if (!session) return { message: "Unauthorized" }
+
+    // Check if server creation is enabled globally
+    const canCreate = await isFeatureEnabled('SERVER_CREATION')
+    if (!canCreate) {
+        return { message: "Server creation is currently disabled." }
+    }
 
     // Superadmin Restriction
     if (!isSuperAdmin(session.user as any)) {

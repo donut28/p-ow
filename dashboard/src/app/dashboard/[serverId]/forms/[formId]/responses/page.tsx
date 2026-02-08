@@ -93,25 +93,33 @@ export default function ResponsesPage({
     const [resolvedParams, setResolvedParams] = useState<{ serverId: string; formId: string } | null>(null)
     const [deleting, setDeleting] = useState<string | null>(null)
 
+    const [canExport, setCanExport] = useState(false)
+
     useEffect(() => {
         params.then(p => {
             setResolvedParams(p)
-            loadData(p.formId)
+            loadData(p.formId, p.serverId)
         })
     }, [params])
 
-    const loadData = async (formId: string) => {
+    const loadData = async (formId: string, serverId: string) => {
         try {
-            const [responsesRes, analyticsRes] = await Promise.all([
+            const [responsesRes, analyticsRes, planRes] = await Promise.all([
                 fetch(`/api/forms/${formId}/responses`),
-                fetch(`/api/forms/${formId}/analytics`)
+                fetch(`/api/forms/${formId}/analytics`),
+                fetch(`/api/server/${serverId}/plan`)
             ])
+
             if (responsesRes.ok) {
                 const data = await responsesRes.json()
                 setResponses(data.responses || [])
             }
             if (analyticsRes.ok) {
                 setAnalytics(await analyticsRes.json())
+            }
+            if (planRes.ok) {
+                const planData = await planRes.json()
+                setCanExport(planData.hasExports)
             }
         } catch (error) {
             console.error("Failed to load data:", error)
@@ -202,12 +210,14 @@ export default function ResponsesPage({
                                 <FileText className="h-4 w-4 inline mr-1" /> Responses
                             </button>
                         </div>
-                        <button
-                            onClick={downloadCsv}
-                            className="flex items-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-sm"
-                        >
-                            <Download className="h-4 w-4" /> Export CSV
-                        </button>
+                        {canExport && (
+                            <button
+                                onClick={downloadCsv}
+                                className="flex items-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-sm"
+                            >
+                                <Download className="h-4 w-4" /> Export CSV
+                            </button>
+                        )}
                         {responses.length > 0 && (
                             <button
                                 onClick={deleteAllResponses}

@@ -119,8 +119,8 @@ export async function POST(
 
         // Validate required questions (SKIP if saving as draft)
         if (!saveAsDraft) {
-            const allQuestions = form.sections.flatMap(s => s.questions)
-            const requiredQuestions = allQuestions.filter(q => q.required)
+            const allQuestions = form.sections.flatMap((s: any) => s.questions)
+            const requiredQuestions = allQuestions.filter((q: any) => q.required)
 
             for (const question of requiredQuestions) {
                 const answer = answers[question.id]

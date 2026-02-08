@@ -1,7 +1,20 @@
 import { NextResponse } from "next/server"
 import { jwtVerify } from "jose"
+import { clerkClient } from "@clerk/nextjs/server"
 import { prisma } from "@/lib/db"
 import { verifyVisionSignature, visionCorsHeaders } from "@/lib/vision-auth"
+import { isFeatureEnabled } from "@/lib/feature-flags"
+
+// Check if user has Pro User subscription via Clerk metadata
+async function checkProUserSubscription(userId: string): Promise<boolean> {
+    try {
+        const clerk = await clerkClient()
+        const user = await clerk.users.getUser(userId)
+        return user.publicMetadata?.subscriptionPlan === 'pow-pro-user'
+    } catch {
+        return false
+    }
+}
 
 // Handle preflight requests
 export async function OPTIONS() {
@@ -38,13 +51,41 @@ export async function GET(req: Request) {
         }
 
         const token = authHeader.substring(7)
+        let payload: any
         try {
-            await jwtVerify(token, VISION_SECRET, {
+            const result = await jwtVerify(token, VISION_SECRET, {
                 issuer: "pow-dashboard",
                 audience: "pow-vision"
             })
+            payload = result.payload
         } catch {
             return NextResponse.json({ error: "Invalid token" }, { status: 401, headers: visionCorsHeaders })
+        }
+
+        // Check subscription - Vision requires Pro User OR member of Max server
+        // First check if user has Pro User subscription (via Clerk metadata)
+        const hasProUser = await checkProUserSubscription(payload.userId)
+
+        if (!hasProUser) {
+            // Check if user is a member of any MAX server
+            const maxServerMember = await prisma.member.findFirst({
+                where: {
+                    OR: [
+                        { discordId: payload.discordId },
+                        { userId: payload.userId }
+                    ],
+                    server: {
+                        subscriptionPlan: 'pow-max'
+                    }
+                }
+            })
+
+            if (!maxServerMember) {
+                return NextResponse.json(
+                    { error: "Vision requires POW Pro User subscription or membership in a POW Max server" },
+                    { status: 403, headers: visionCorsHeaders }
+                )
+            }
         }
 
         // Get username from query

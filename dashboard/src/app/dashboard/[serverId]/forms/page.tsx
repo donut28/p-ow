@@ -21,7 +21,7 @@ export default async function FormsPage({
         where: { userId: session.user.id },
         select: { formId: true }
     })
-    const accessibleFormIds = editorAccess.map(ea => ea.formId)
+    const accessibleFormIds = editorAccess.map((ea: any) => ea.formId)
 
     const forms = await prisma.form.findMany({
         where: isAdmin ? { serverId } : {
@@ -92,7 +92,7 @@ export default async function FormsPage({
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {forms.map((form) => {
+                        {forms.map((form: any) => {
                             const canEdit = isAdmin || accessibleFormIds.includes(form.id)
                             return (
                                 <div

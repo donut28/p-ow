@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db"
 import { isSuperAdmin } from "@/lib/admin"
 import { NextResponse } from "next/server"
 import { RollbackService } from "@/lib/rollback-service"
-import { queueCommand } from "@/lib/cross-server-sync"
+// import { queueCommand } from "@/lib/cross-server-sync"
 
 export async function POST(req: Request) {
     const session = await getSession()
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
         // 1. Determine time range
         // If timestamp is provided, use it. Otherwise default to 24 hours ago.
         const startTime = timestamp ? new Date(timestamp) : new Date(Date.now() - 24 * 60 * 60 * 1000)
-        
+
         // We need to find logs where this user was the ACTOR.
         // In our Log model:
         // - type="command", playerId=targetUserId
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
             },
             orderBy: { createdAt: "desc" },
             // If explicit timestamp is given, allow more logs (up to 1000), otherwise restrict to 100
-            take: timestamp ? 1000 : 100 
+            take: timestamp ? 1000 : 100
         })
 
         if (logs.length === 0) {
@@ -59,13 +59,14 @@ export async function POST(req: Request) {
 
         // 3. Queue Reversals
         for (const reversal of reversals) {
-            await queueCommand(
-                serverId,
-                reversal.command,
-                10, // High priority
-                serverId,
-                targetUserId
-            )
+            // TODO: Re-implement using PrcClient or new queue system
+            // await queueCommand(
+            //     serverId,
+            //     reversal.command,
+            //     10, // High priority
+            //     serverId,
+            //     targetUserId
+            // )
         }
 
         // 4. Log the Rollback Action (Security Log)
@@ -78,9 +79,9 @@ export async function POST(req: Request) {
             }
         })
 
-        return NextResponse.json({ 
-            success: true, 
-            reversalsQueued: reversals.length 
+        return NextResponse.json({
+            success: true,
+            reversalsQueued: reversals.length
         })
 
     } catch (e: any) {

@@ -80,7 +80,7 @@ export async function GET(
         // Collect respondent IDs
         const respondentIds = responses
             .map(r => r.respondentId)
-            .filter((id): id is string => id !== null)
+            .filter((id: string | null): id is string => id !== null)
 
         // Fetch user details from Clerk
         const users = respondentIds.length > 0
@@ -100,7 +100,7 @@ export async function GET(
         }))
 
         // Format responses
-        const formattedResponses = responses.map(r => {
+        const formattedResponses = responses.map((r: any) => {
             const user = r.respondentId ? userMap.get(r.respondentId) : null
 
             return {
@@ -111,7 +111,7 @@ export async function GET(
                     email: user.email,
                     name: user.robloxUsername || user.username
                 } : { name: "Anonymous" }),
-                answers: r.answers.reduce((acc, a) => {
+                answers: r.answers.reduce((acc: Record<string, any>, a: any) => {
                     let value
                     try {
                         value = JSON.parse(a.value)
@@ -129,15 +129,28 @@ export async function GET(
 
         // Export as CSV
         if (format === "csv") {
-            const allQuestions = form.sections.flatMap(s => s.questions)
+            // Check feature flags and plan limits
+            const { isFeatureEnabled } = await import("@/lib/feature-flags")
+            const { getServerPlan } = await import("@/lib/subscription")
+
+            const exportsEnabled = await isFeatureEnabled('EXPORTS')
+            const { hasExports } = await getServerPlan(form.serverId)
+
+            if (!exportsEnabled || !hasExports) {
+                return NextResponse.json({
+                    error: "CSV export is available on paid plans only.",
+                    upgradeRequired: true
+                }, { status: 403 })
+            }
+            const allQuestions = form.sections.flatMap((s: any) => s.questions)
             const headers = [
                 "Response ID",
                 "Submitted At",
                 ...(form.isAnonymous ? [] : ["Respondent ID", "Email", "Name"]),
-                ...allQuestions.map(q => q.label)
+                ...allQuestions.map((q: any) => q.label)
             ]
 
-            const rows = formattedResponses.map(r => {
+            const rows = formattedResponses.map((r: any) => {
                 const row = [
                     r.id,
                     r.submittedAt.toISOString(),
@@ -153,7 +166,7 @@ export async function GET(
 
             const csv = [
                 headers.join(","),
-                ...rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+                ...rows.map((r: any[]) => r.map((cell: any) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
             ].join("\n")
 
             return new NextResponse(csv, {

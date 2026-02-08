@@ -5,7 +5,6 @@ import { handleShiftCommand } from "./commands/shift"
 import { handleQuotaCommand } from "./commands/quota"
 import { handleIngameCommand } from "./commands/ingame"
 import { handlePunishCommand } from "./commands/punish"
-import { handleSyncCommand } from "./commands/sync"
 import { handleStaffRequestCommand } from "./commands/staffrequest"
 import { startBotQueueService } from "./services/bot-queue"
 import { startLogSyncService } from "./services/log-sync"
@@ -92,9 +91,6 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
                 break
             case "log":
                 await handlePunishCommand(interaction)
-                break
-            case "sync":
-                await handleSyncCommand(interaction)
                 break
             case "staffrequest":
                 await handleStaffRequestCommand(interaction)

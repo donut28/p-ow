@@ -140,11 +140,6 @@ const commands = [
                         ))
         ),
 
-    // Manage Panel Roles (Sync)
-    new SlashCommandBuilder()
-        .setName("sync")
-        .setDescription("Sync your roles and permissions"),
-
     // Staff Request Command
     new SlashCommandBuilder()
         .setName("staffrequest")

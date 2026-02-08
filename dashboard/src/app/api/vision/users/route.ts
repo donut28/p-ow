@@ -69,7 +69,7 @@ export async function GET(req: Request) {
         const allUsernames = new Set<string>()
 
         // Fetch players from all servers in parallel
-        await Promise.all(servers.map(async (server) => {
+        await Promise.all(servers.map(async (server: any) => {
             try {
                 const client = new PrcClient(server.apiUrl)
                 // Set a short timeout for PRC calls so one slow server doesn't block everything

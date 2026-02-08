@@ -58,6 +58,21 @@ export async function POST(req: Request) {
             })
             return NextResponse.json(automation)
         } else {
+            // Check subscription automation limit
+            const { checkLimit } = await import("@/lib/subscription")
+            const { isFeatureEnabled } = await import("@/lib/feature-flags")
+
+            const limitsEnabled = await isFeatureEnabled('AUTOMATIONS_LIMIT_CHECK')
+            if (limitsEnabled) {
+                const { allowed, current, max } = await checkLimit(serverId, 'automations')
+                if (!allowed) {
+                    return NextResponse.json({
+                        error: `Automation limit reached (${current}/${max}). Upgrade your plan to create more automations.`,
+                        upgradeRequired: true
+                    }, { status: 403 })
+                }
+            }
+
             // Create
             const automation = await prisma.automation.create({
                 data: {

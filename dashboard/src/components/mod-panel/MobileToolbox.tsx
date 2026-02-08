@@ -1,8 +1,7 @@
 "use client"
 
 import React, { useState } from "react"
-import { Bot, Command, Zap, Calendar, X, Send, Loader2, Check, Terminal, ClipboardList, Bell, ChevronRight } from "lucide-react"
-import { GarminPanel } from "./garmin-panel"
+import { Command, Calendar, X, Send, Loader2, Check, Terminal, ClipboardList, Bell, ChevronRight } from "lucide-react"
 import { usePermissions } from "@/components/auth/role-sync-wrapper"
 
 interface MobileToolboxProps {
@@ -11,7 +10,6 @@ interface MobileToolboxProps {
 }
 
 export function MobileToolbox({ serverId, isOnLoa }: MobileToolboxProps) {
-    const [garminOpen, setGarminOpen] = useState(false)
     const [loaOpen, setLoaOpen] = useState(false)
     const [commandOpen, setCommandOpen] = useState(false)
     const [permLogOpen, setPermLogOpen] = useState(false)
@@ -174,17 +172,6 @@ export function MobileToolbox({ serverId, isOnLoa }: MobileToolboxProps) {
     // Tool buttons data
     const tools = [
         {
-            id: "garmin",
-            name: "Garmin",
-            description: "AI-powered roleplay assistant",
-            icon: Bot,
-            colorClass: "text-indigo-400",
-            bgClass: "bg-indigo-500/10",
-            borderClass: "border-indigo-500/20",
-            show: permissions.canUseToolbox,
-            onClick: () => setGarminOpen(true),
-        },
-        {
             id: "permlog",
             name: "Perm Log",
             description: "Record permission usage",
@@ -256,19 +243,6 @@ export function MobileToolbox({ serverId, isOnLoa }: MobileToolboxProps) {
                     )
                 })}
             </div>
-
-            {/* Garmin Panel Modal */}
-            {garminOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="w-full max-w-2xl h-[80vh] bg-[#111] rounded-2xl overflow-hidden shadow-2xl shadow-indigo-500/10 border border-[#333]">
-                        <GarminPanel
-                            serverId={serverId}
-                            isOpen={true}
-                            onClose={() => setGarminOpen(false)}
-                        />
-                    </div>
-                </div>
-            )}
 
             {/* Perm Log Modal */}
             {permLogOpen && (

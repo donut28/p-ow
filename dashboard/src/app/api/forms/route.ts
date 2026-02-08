@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
                 where: { userId: session.user.id },
                 select: { formId: true }
             })
-            const accessibleFormIds = editorAccess.map(ea => ea.formId)
+            const accessibleFormIds = editorAccess.map((ea: any) => ea.formId)
 
             forms = await prisma.form.findMany({
                 where: {
@@ -87,6 +87,21 @@ export async function POST(request: NextRequest) {
         const isAdmin = await isServerAdmin(session.user, serverId)
         if (!isAdmin) {
             return NextResponse.json({ error: "Admin access required" }, { status: 403 })
+        }
+
+        // Check subscription form limit
+        const { checkLimit } = await import("@/lib/subscription")
+        const { isFeatureEnabled } = await import("@/lib/feature-flags")
+
+        const limitsEnabled = await isFeatureEnabled('FORMS_LIMIT_CHECK')
+        if (limitsEnabled) {
+            const { allowed, current, max } = await checkLimit(serverId, 'forms')
+            if (!allowed) {
+                return NextResponse.json({
+                    error: `Form limit reached (${current}/${max}). Upgrade your plan to create more forms.`,
+                    upgradeRequired: true
+                }, { status: 403 })
+            }
         }
 
         // If sections are provided, validate/structure them for nested create

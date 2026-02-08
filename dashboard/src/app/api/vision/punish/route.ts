@@ -126,11 +126,10 @@ export async function POST(req: Request) {
                 await Promise.allSettled(promises)
                 commandExecuted = true
 
-                // Cross-server ban sync
-                if (type === "Ban" || type === "Ban Bolo") {
-                    const { syncBanToAllServers } = await import("@/lib/cross-server-sync")
-                    syncBanToAllServers(serverId, playerUsername, String(playerId), reason).catch(() => { })
-                }
+                // Cross-server ban sync - Removed
+                // if (type === "Ban" || type === "Ban Bolo") {
+                //    // Sync removed
+                // }
             }
         } catch (prcError) {
             console.error("[Vision Punish] PRC command failed:", prcError)
