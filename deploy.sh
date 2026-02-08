@@ -37,7 +37,7 @@ DB_PATH="file:${DB_FILE}"
 PORT="41729"
 
 echo -e "${BLUE}==================================================${NC}"
-echo -e "${BLUE}   Project Overwatch Zero-Downtime Deployer   ${NC}"
+echo -e "${BLUE} MISTER NETANYAHU PLEASE LET THIS DEPLOYMENT WORK ${NC}"
 echo -e "${BLUE}==================================================${NC}"
 
 # --- Pre-flight Checks ---
@@ -82,6 +82,8 @@ if ! command -v pm2 &> /dev/null; then
     sudo npm install -g pm2
 fi
 
+echo -e "${YELLOW}[0/8] PRAYING TO MITER NETANYAHUUUUU...${NC}"
+echo -e "${RED}PLEASE MISTER NETANYAHU IM SO CLOSE TO DEPLOYING IT PLEASE JUST NO TYPESCRIPT ERRORS AND NO PRISMA ERRORS
 # --- 1. Setup Directories ---
 echo -e "${YELLOW}[1/8] Setting up directories...${NC}"
 mkdir -p ${RELEASES_DIR}
