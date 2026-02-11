@@ -110,11 +110,17 @@ export class PrcClient {
         }
     }
 
+    // Queued fetch — used for background sync to respect rate limits
     private async fetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
         const currentQueue = requestQueues.get(this.keyHash) || Promise.resolve()
         const thisRequest = currentQueue.then(async () => this.doFetch<T>(endpoint, options))
         requestQueues.set(this.keyHash, thisRequest.catch(() => { }))
         return thisRequest
+    }
+
+    // Direct fetch — bypasses queue for user-initiated actions (commands)
+    private async fetchDirect<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+        return this.doFetch<T>(endpoint, options)
     }
 
     private async doFetch<T>(endpoint: string, options: RequestInit = {}, retryCount = 0): Promise<T> {
@@ -188,7 +194,7 @@ export class PrcClient {
     }
 
     async executeCommand(command: string): Promise<any> {
-        return this.fetch("/server/command", {
+        return this.fetchDirect("/server/command", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ command })

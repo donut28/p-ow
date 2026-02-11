@@ -1,10 +1,26 @@
 
 import { auth, currentUser } from "@clerk/nextjs/server"
 
+// Timeout wrapper to prevent Clerk outages from hanging all requests
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+    let timeoutId: ReturnType<typeof setTimeout>
+    const timeoutPromise = new Promise<null>((resolve) => {
+        timeoutId = setTimeout(() => resolve(null), ms)
+    })
+    try {
+        const result = await Promise.race([promise, timeoutPromise])
+        clearTimeout(timeoutId!)
+        return result
+    } catch {
+        clearTimeout(timeoutId!)
+        return null
+    }
+}
+
 // Helper to get consistent user object, similar to what we had
 // Also enforces Discord and Roblox connection if needed
 export async function getSession() {
-    const user = await currentUser()
+    const user = await withTimeout(currentUser(), 5000)
     if (!user) return null
 
     // Find discord account (cast to string to handle Clerk's strict types)

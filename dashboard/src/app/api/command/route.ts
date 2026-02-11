@@ -58,6 +58,14 @@ export async function POST(req: Request) {
 
         return NextResponse.json({ success: true })
     } catch (e: any) {
-        return NextResponse.json({ error: e.message || "Failed to execute command" }, { status: 500 })
+        const msg = e.message || "Failed to execute command"
+        // PRC-specific errors → 422 (not our fault, PRC is down/slow)
+        if (msg.includes("PRC API Timeout") || msg.includes("Rate Limited") || msg.includes("ECONNRESET")) {
+            return NextResponse.json({ error: "PRC API is currently unavailable. The game server may be offline or the API is experiencing issues. Try again in a moment." }, { status: 422 })
+        }
+        if (msg.includes("Invalid API Key")) {
+            return NextResponse.json({ error: "Invalid PRC API key. Please check your server settings." }, { status: 403 })
+        }
+        return NextResponse.json({ error: msg }, { status: 500 })
     }
 }

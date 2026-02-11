@@ -35,7 +35,6 @@ export default async function ServerSelectorPage() {
     const serversWithStats = await Promise.all(servers.map(async (s: any) => {
         const stats = await fetchServerStats(s.apiUrl)
         return { ...s, stats }
-        return { ...s, stats }
     }))
 
     // Check Feature Flag
