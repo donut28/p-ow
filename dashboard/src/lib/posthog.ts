@@ -8,11 +8,10 @@ export default function PostHogClient() {
             process.env.NEXT_PUBLIC_POSTHOG_KEY!,
             {
                 host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
-                // Batch events to avoid per-capture HTTP overhead.
-                // POW runs as a persistent PM2 process (not serverless),
-                // so batching is safe and significantly reduces network I/O.
-                flushAt: 20,
-                flushInterval: 10000
+                // Flush immediately to ensure data is available for the status dashboard.
+                // This eliminates batching delays.
+                flushAt: 1,
+                flushInterval: 0
             }
         )
     }

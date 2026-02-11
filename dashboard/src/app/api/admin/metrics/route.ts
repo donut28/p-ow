@@ -2,7 +2,8 @@ import { getSession } from "@/lib/auth-clerk"
 import { isSuperAdmin } from "@/lib/admin"
 import { NextResponse } from "next/server"
 
-const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://eu.i.posthog.com"
+// Use the app/API host for queries (ingestion host eu.i.posthog.com does not support /query/)
+const POSTHOG_HOST = "https://eu.posthog.com"
 const POSTHOG_PERSONAL_KEY = process.env.POSTHOG_PERSONAL_API_KEY
 const POSTHOG_PROJECT_ID = process.env.POSTHOG_PROJECT_ID
 
@@ -21,6 +22,7 @@ async function queryPostHogEvents(eventName: string, hours: number = 24): Promis
 
     try {
         // Use the HogQL query API (recommended) instead of the deprecated /events endpoint
+        // NOTE: Personal API key requests must go to the main API host, not the ingestion host.
         const res = await fetch(
             `${POSTHOG_HOST}/api/projects/${POSTHOG_PROJECT_ID}/query/`,
             {
@@ -32,7 +34,8 @@ async function queryPostHogEvents(eventName: string, hours: number = 24): Promis
                 body: JSON.stringify({
                     query: {
                         kind: "HogQLQuery",
-                        query: `SELECT event, properties, timestamp FROM events WHERE event = '${eventName}' AND timestamp > '${after}' ORDER BY timestamp DESC LIMIT 500`
+                        // Use toDateTime() for robust timestamp comparison in HogQL
+                        query: `SELECT event, properties, timestamp FROM events WHERE event = '${eventName}' AND timestamp > toDateTime('${after}') ORDER BY timestamp DESC LIMIT 500`
                     }
                 }),
                 cache: "no-store",
@@ -40,7 +43,8 @@ async function queryPostHogEvents(eventName: string, hours: number = 24): Promis
         )
 
         if (!res.ok) {
-            console.error(`[METRICS] PostHog query failed: ${res.status} ${res.statusText}`)
+            const errorText = await res.text()
+            console.error(`[METRICS] PostHog query failed: ${res.status} ${res.statusText}`, errorText)
             return []
         }
 
