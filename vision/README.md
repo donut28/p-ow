@@ -2,29 +2,6 @@
 
 Roblox moderation overlay with OCR player detection.
 
-## Development
-
-```bash
-# Install dependencies
-npm install
-
-# Start development mode (Vite + Electron)
-npm run dev
-```
-
-## Building
-
-```bash
-# Build for Windows
-npm run build:win
-
-# Build for Mac
-npm run build:mac
-
-# Build for all platforms
-npm run build:all
-```
-
 ## Features
 
 - **OCR Player Detection** - Press Alt+V to scan and detect player name
